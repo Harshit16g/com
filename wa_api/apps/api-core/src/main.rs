@@ -11,7 +11,7 @@ async fn main() {
 
     let state = Arc::new(shared::state::init().await);
 
-    let _handles = vec![
+    let _handles = [
         tokio::spawn(api_gateway::start_server(state.clone())),
         tokio::spawn(pool_manager::start(state.clone())),
         tokio::spawn(health_monitor::start(state.clone())),
