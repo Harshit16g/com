@@ -31,11 +31,13 @@ pub async fn run_worker(worker_id: usize, state: Arc<AppState>) {
         };
 
         // BRPOP with 1s timeout
+        tracing::info!("Waiting for job...");
         let job_result = state.redis.clone().brpop_ready(&tenant_ids, 1.0).await;
 
         match job_result {
             Ok(Some((_, job_json))) => match serde_json::from_str::<WhatsAppJob>(&job_json) {
                 Ok(job) => {
+                    tracing::info!("Job received!");
                     process_job(worker_id, job, Arc::clone(&state)).await;
                 }
                 Err(e) => {
@@ -128,17 +130,23 @@ async fn process_job(worker_id: usize, job: WhatsAppJob, state: Arc<AppState>) {
     }
 
     // ── Step 5: Opt-out check ─────────────────────────────────────────────
-    match state.db.is_opted_out_platform(&phone_hash).await {
-        Ok(true) => {
-            info!(job_id = %job_id, "Recipient opted out — blocking permanently");
-            persist_status(&state.db, &job, JobStatus::BlockedOptOut, None, None).await;
-            let _ = redis.del(&lock_key).await;
-            return;
-        }
-        Err(e) => {
-            warn!("Opt-out check error: {} — proceeding", e);
-        }
-        _ => {}
+    let mut is_opt_out = false;
+    match redis.get_cached_opt_out(&phone_hash).await {
+        Ok(Some(status)) => is_opt_out = status,
+        _ => match state.db.is_opted_out_platform(&phone_hash).await {
+            Ok(status) => {
+                is_opt_out = status;
+                let _ = redis.cache_opt_out(&phone_hash, status).await;
+            }
+            Err(e) => warn!("Opt-out DB check error: {} — proceeding", e),
+        },
+    }
+
+    if is_opt_out {
+        info!(job_id = %job_id, "Recipient opted out — blocking permanently");
+        persist_status(&state.db, &job, JobStatus::BlockedOptOut, None, None).await;
+        let _ = redis.del(&lock_key).await;
+        return;
     }
 
     // ── Step 6: Idempotency check ─────────────────────────────────────────

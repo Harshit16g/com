@@ -1,6 +1,4 @@
-use anyhow::Result;
 use tracing::info;
-use std::sync::Arc;
 
 use crate::{
     config::AppConfig, db::DbClient, evolution::EvolutionClient, redis_client::RedisClient,

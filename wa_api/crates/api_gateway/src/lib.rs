@@ -38,10 +38,16 @@ pub async fn start_server(state: Arc<AppState>) -> Result<()> {
         .merge(routes::admin::router())
         .route_layer(middleware::from_fn(auth::admin_auth_middleware));
 
-    // Webhook endpoint — no auth (Evolution API calls this)
     let webhook_routes = routes::webhook::router();
 
+    // Health route
+    let health_route = Router::new().route(
+        "/health",
+        axum::routing::get(|| async { "OK" }),
+    );
+
     let app = Router::new()
+        .merge(health_route)
         .merge(authed_routes)
         .merge(admin_routes)
         .merge(webhook_routes)
@@ -50,9 +56,11 @@ pub async fn start_server(state: Arc<AppState>) -> Result<()> {
         .with_state(state);
 
     let addr = format!("0.0.0.0:{}", port);
-    info!("wa_api gateway listening on {}", addr);
-
+    info!("Starting API server...");
+    
     let listener = tokio::net::TcpListener::bind(&addr).await?;
+    info!("Listening on {}", addr);
+    
     axum::serve(listener, app)
         .with_graceful_shutdown(shutdown_signal())
         .await?;

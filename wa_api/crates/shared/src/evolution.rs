@@ -118,80 +118,100 @@ impl EvolutionClient {
             &phone[..4]
         );
 
-        let resp = self
-            .client
-            .post(&url)
-            .header("apikey", &self.api_key)
-            .json(&body)
-            .send()
-            .await
-            .map_err(|e| EvolutionError::Transient(e.to_string()))?;
+        let mut last_error = "Unknown failure".to_string();
+        for attempt in 1..=3 {
+            let request_future = self
+                .client
+                .post(&url)
+                .header("apikey", &self.api_key)
+                .json(&body)
+                .send();
 
-        let status = resp.status();
+            match tokio::time::timeout(std::time::Duration::from_secs(10), request_future).await {
+                Ok(Ok(resp)) => {
+                    let status = resp.status();
 
-        if status == 429 {
-            let retry_after = resp
-                .headers()
-                .get("retry-after")
-                .and_then(|v| v.to_str().ok())
-                .and_then(|s| s.parse().ok())
-                .unwrap_or(60);
-            return Err(EvolutionError::RateLimit {
-                retry_after_secs: retry_after,
-            });
+                    if status == 429 {
+                        let retry_after = resp
+                            .headers()
+                            .get("retry-after")
+                            .and_then(|v| v.to_str().ok())
+                            .and_then(|s| s.parse().ok())
+                            .unwrap_or(60);
+                        return Err(EvolutionError::RateLimit {
+                            retry_after_secs: retry_after,
+                        });
+                    }
+
+                    if status.is_server_error() {
+                        let body_text = resp.text().await.unwrap_or_default();
+                        last_error = format!("HTTP {}: {}", status, body_text);
+                        // Retry backoff
+                        tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+                        continue;
+                    }
+
+                    let body_text = resp
+                        .text()
+                        .await
+                        .map_err(|e| EvolutionError::Transient(e.to_string()))?;
+
+                    // Check for known error strings in response body
+                    let lower = body_text.to_lowercase();
+                    if lower.contains("qr_required")
+                        || lower.contains("auth_failed")
+                        || lower.contains("unauthorized")
+                    {
+                        return Err(EvolutionError::AuthRequired(body_text));
+                    }
+                    if lower.contains("banned") || lower.contains("account_restricted") {
+                        return Err(EvolutionError::Banned(body_text));
+                    }
+                    if lower.contains("invalid_number")
+                        || lower.contains("not_on_whatsapp")
+                        || lower.contains("not registered")
+                    {
+                        return Err(EvolutionError::InvalidRecipient(body_text));
+                    }
+                    if lower.contains("instance_not_found")
+                        || lower.contains("session_closed")
+                        || lower.contains("disconnected")
+                    {
+                        return Err(EvolutionError::InstanceDisconnected(body_text));
+                    }
+
+                    // Parse message ID from response
+                    let send_resp: SendResponse = serde_json::from_str(&body_text).map_err(|e| {
+                        EvolutionError::Transient(format!(
+                            "Failed to parse response: {} body={}",
+                            e, body_text
+                        ))
+                    })?;
+
+                    let msg_id = send_resp
+                        .key
+                        .and_then(|k| k.id)
+                        .unwrap_or_else(|| uuid::Uuid::new_v4().to_string());
+
+                    return Ok(msg_id);
+                }
+                Ok(Err(req_err)) => {
+                    last_error = req_err.to_string();
+                }
+                Err(_) => {
+                    last_error = "Timeout exceeded".to_string();
+                }
+            }
+
+            if attempt < 3 {
+                tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+            }
         }
 
-        if status.is_server_error() {
-            let body_text = resp.text().await.unwrap_or_default();
-            return Err(EvolutionError::Transient(format!(
-                "HTTP {}: {}",
-                status, body_text
-            )));
-        }
-
-        let body_text = resp
-            .text()
-            .await
-            .map_err(|e| EvolutionError::Transient(e.to_string()))?;
-
-        // Check for known error strings in response body
-        let lower = body_text.to_lowercase();
-        if lower.contains("qr_required")
-            || lower.contains("auth_failed")
-            || lower.contains("unauthorized")
-        {
-            return Err(EvolutionError::AuthRequired(body_text));
-        }
-        if lower.contains("banned") || lower.contains("account_restricted") {
-            return Err(EvolutionError::Banned(body_text));
-        }
-        if lower.contains("invalid_number")
-            || lower.contains("not_on_whatsapp")
-            || lower.contains("not registered")
-        {
-            return Err(EvolutionError::InvalidRecipient(body_text));
-        }
-        if lower.contains("instance_not_found")
-            || lower.contains("session_closed")
-            || lower.contains("disconnected")
-        {
-            return Err(EvolutionError::InstanceDisconnected(body_text));
-        }
-
-        // Parse message ID from response
-        let send_resp: SendResponse = serde_json::from_str(&body_text).map_err(|e| {
-            EvolutionError::Transient(format!(
-                "Failed to parse response: {} body={}",
-                e, body_text
-            ))
-        })?;
-
-        let msg_id = send_resp
-            .key
-            .and_then(|k| k.id)
-            .unwrap_or_else(|| uuid::Uuid::new_v4().to_string());
-
-        Ok(msg_id)
+        Err(EvolutionError::Transient(format!(
+            "Failed after 3 attempts: {}",
+            last_error
+        )))
     }
 
     /// Check the connection status of an Evolution API instance.

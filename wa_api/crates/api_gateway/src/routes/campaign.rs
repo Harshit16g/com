@@ -80,6 +80,21 @@ async fn start_campaign(
             .into_response();
     }
 
+    // ── Backpressure check ─────────────────────────────────────────────
+    if let Ok(len) = state.redis.queue_len_ready(&ctx.tenant_id.to_string()).await {
+        if len > 5000 {
+            tracing::warn!(tenant_id = %ctx.tenant_id, queue_len = len, "Backpressure triggered in campaign sender");
+            return (
+                StatusCode::TOO_MANY_REQUESTS,
+                Json(json!({
+                    "error": "Your tenant queue is currently overloaded. Please wait for existing jobs to process.",
+                    "code": "BACKPRESSURE_TRIGGERED"
+                })),
+            )
+                .into_response();
+        }
+    }
+
     // Validate all phone numbers upfront
     let invalid: Vec<&String> = req
         .recipients

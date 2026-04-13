@@ -41,6 +41,8 @@ dependencies = [
  "pool_manager",
  "shared",
  "tokio",
+ "tracing",
+ "tracing-subscriber",
 ]
 
 [[package]]
@@ -3352,6 +3354,8 @@ dependencies = [
  "scheduler",
  "shared",
  "tokio",
+ "tracing",
+ "tracing-subscriber",
  "worker",
 ]
 

@@ -10,3 +10,5 @@ api_gateway = { path = "../../crates/api_gateway" }
 pool_manager = { path = "../../crates/pool_manager" }
 health_monitor = { path = "../../crates/health_monitor" }
 shared = { path = "../../crates/shared" }
+tracing.workspace = true
+tracing-subscriber.workspace = true

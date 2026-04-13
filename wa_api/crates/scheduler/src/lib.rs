@@ -60,6 +60,16 @@ async fn tick(redis: &RedisClient) -> Result<()> {
             redis.lpush_ready(tenant_id, &job_json).await?;
             redis.zrem_scheduled(tenant_id, job_id).await?;
         }
+
+        if !job_ids.is_empty() {
+            let ready_len = redis.queue_len_ready(tenant_id).await.unwrap_or(0);
+            info!(
+                tenant_id = %tenant_id,
+                moved_jobs = job_ids.len(),
+                queue_len_ready = ready_len,
+                "Promoted scheduled jobs to ready queue"
+            );
+        }
     }
 
     Ok(())

@@ -1,8 +1,14 @@
 use std::sync::Arc;
 use tokio::signal;
+use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
 
 #[tokio::main]
 async fn main() {
+    tracing_subscriber::registry()
+        .with(EnvFilter::try_from_default_env().unwrap_or_else(|_| "info".into()))
+        .with(tracing_subscriber::fmt::layer().with_target(true))
+        .init();
+
     let state = Arc::new(shared::state::init().await);
 
     let mut handles = vec![];
@@ -13,9 +19,9 @@ async fn main() {
 
     tokio::select! {
         _ = signal::ctrl_c() => {
-            println!("Shutdown signal received");
+            tracing::info!("Shutdown signal received");
         }
     }
 
-    println!("Shutting down tasks...");
+    tracing::info!("Shutting down tasks...");
 }

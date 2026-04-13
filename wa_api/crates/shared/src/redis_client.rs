@@ -166,6 +166,33 @@ impl RedisClient {
         Ok(())
     }
 
+    pub async fn queue_len_ready(&self, tenant_id: &str) -> Result<usize> {
+        let key = format!("jobs:ready:{}", tenant_id);
+        let len: usize = self.pool.llen(&key).await?;
+        Ok(len)
+    }
+
+    // ─── Opt-out cache ────────────────────────────────────────────────────
+
+    pub async fn cache_opt_out(&self, phone_hash: &str, status: bool) -> Result<()> {
+        let key = format!("opt_out:{}", phone_hash);
+        let val = if status { "1" } else { "0" };
+        let _: () = self
+            .pool
+            .set(&key, val, Some(Expiration::EX(24 * 3600)), None, false)
+            .await?;
+        Ok(())
+    }
+
+    pub async fn get_cached_opt_out(&self, phone_hash: &str) -> Result<Option<bool>> {
+        let key = format!("opt_out:{}", phone_hash);
+        let raw: Option<String> = self.pool.get(&key).await?;
+        match raw {
+            Some(s) => Ok(Some(s == "1")),
+            None => Ok(None),
+        }
+    }
+
     // ─── Job metadata ─────────────────────────────────────────────────────
 
     pub async fn save_job(&self, job: &WhatsAppJob) -> Result<()> {

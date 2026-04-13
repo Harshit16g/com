@@ -88,6 +88,22 @@ async fn send_message(
         _ => MessageType::ManualCrm,
     };
 
+    // ── 1.5 Backpressure check ─────────────────────────────────────────────
+    if let Ok(len) = state.redis.queue_len_ready(&ctx.tenant_id.to_string()).await {
+        // Soft limit of 5000 active queued jobs per tenant
+        if len > 5000 {
+            tracing::warn!(tenant_id = %ctx.tenant_id, queue_len = len, "Backpressure triggered in message sender");
+            return (
+                StatusCode::TOO_MANY_REQUESTS,
+                Json(json!({
+                    "error": "Your tenant queue is currently overloaded. Please wait for existing jobs to process.",
+                    "code": "BACKPRESSURE_TRIGGERED"
+                })),
+            )
+                .into_response();
+        }
+    }
+
     // ── 2. Check opt-out ───────────────────────────────────────────────────
     let phone_hash = shared::utils::hash_phone(&req.phone);
 
@@ -181,6 +197,7 @@ async fn send_message(
 
     // If scheduled in the future, put in ZSET; else put directly in ready queue
     let now = Utc::now();
+    tracing::info!("Pushing job to queue...");
     let result = if scheduled_at <= now {
         redis
             .lpush_ready(&ctx.tenant_id.to_string(), &job_json)
