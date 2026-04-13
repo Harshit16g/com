@@ -22,6 +22,9 @@ RUN if [ -d "./Docker/scripts" ]; then \
     else \
     echo "No scripts directory found, skipping..."; \
     fi
+
+RUN npx prisma generate
+
 # Generate DB + build
 RUN npm run build
 
