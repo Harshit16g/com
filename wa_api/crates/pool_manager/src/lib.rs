@@ -6,7 +6,6 @@ use tracing::{error, info, warn};
 
 
 use shared::{
-    config::AppConfig,
     evolution::EvolutionClient,
     redis_client::RedisClient,
     types::{InstanceHealth, PoolNumberState},
