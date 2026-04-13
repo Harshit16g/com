@@ -5,7 +5,7 @@ use shared::utils::hash_phone;
 use std::sync::Arc;
 use tracing::info;
 
-use crate::state::AppState;
+use shared::state::AppState;
 
 /// Evolution API webhook payload (simplified).
 #[derive(Debug, Deserialize)]

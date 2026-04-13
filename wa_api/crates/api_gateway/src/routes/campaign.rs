@@ -16,7 +16,8 @@ use std::sync::Arc;
 use tracing::{error, info};
 use uuid::Uuid;
 
-use crate::{services::spam_guard, state::AppState};
+use crate::services::spam_guard;
+use shared::state::AppState;
 use shared::types::TenantContext;
 
 // ─── Request / Response ───────────────────────────────────────────────────────
@@ -182,12 +183,13 @@ async fn start_campaign(
         };
 
         // Save job metadata
-        if redis.save_job(&job).await.is_err() {
+        let save_result: anyhow::Result<()> = redis.save_job(&job).await;
+        if save_result.is_err() {
             continue;
         }
 
         // Enqueue: scheduled or immediate
-        let result = if scheduled_at <= Utc::now() {
+        let result: anyhow::Result<()> = if scheduled_at <= Utc::now() {
             redis
                 .lpush_ready(&ctx.tenant_id.to_string(), &job_json)
                 .await

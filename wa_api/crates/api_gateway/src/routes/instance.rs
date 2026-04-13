@@ -6,7 +6,7 @@ use shared::types::TenantContext;
 use std::sync::Arc;
 use tracing::error;
 
-use crate::state::AppState;
+use shared::state::AppState;
 
 /// GET /instance/qr
 /// Returns QR base64 for the tenant's instance.

@@ -3,32 +3,21 @@ use serde_json::json;
 use std::time::Duration;
 use tokio::time::sleep;
 use tracing::{error, info, warn};
-use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
+
 
 use shared::{
     config::AppConfig, db::DbClient, evolution::EvolutionClient, redis_client::RedisClient,
     types::InstanceHealth,
 };
 
-#[tokio::main]
-async fn main() -> Result<()> {
-    tracing_subscriber::registry()
-        .with(EnvFilter::try_from_default_env().unwrap_or_else(|_| "info".into()))
-        .with(
-            tracing_subscriber::fmt::layer()
-                .with_target(true)
-                .with_thread_ids(false)
-                .with_file(false)
-                .with_line_number(false)
-                .pretty(),
-        )
-        .init();
+use shared::state::AppState;
+use std::sync::Arc;
 
-    let config = AppConfig::from_env()?;
-    let redis = RedisClient::new(&config.redis_url).await?;
-    let evolution = EvolutionClient::new(&config.evolution_base_url, &config.evolution_api_key);
-    let supabase = DbClient::new(&config.database_url).await?;
-    let alert_url = config.alert_webhook_url.clone();
+pub async fn start(state: Arc<AppState>) -> Result<()> {
+    let redis = &state.redis;
+    let evolution = &state.evolution;
+    let supabase = &state.db;
+    let alert_url = state.config.alert_webhook_url.clone();
 
     info!("Health monitor started — checking every 5 minutes");
 

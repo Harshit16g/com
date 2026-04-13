@@ -1,0 +1,22 @@
+FROM lukemathwalker/cargo-chef:latest as chef
+WORKDIR /app
+
+FROM chef as planner
+COPY . .
+RUN cargo chef prepare --recipe-path recipe.json
+
+FROM chef as builder
+COPY --from=planner /app/recipe.json recipe.json
+RUN cargo chef cook --release --recipe-path recipe.json
+
+COPY . .
+RUN cargo build --release -p api-core
+
+FROM debian:bookworm-slim
+
+RUN apt-get update && apt-get install -y libssl-dev ca-certificates && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+COPY --from=builder /app/target/release/api-core .
+
+CMD ["./api-core"]

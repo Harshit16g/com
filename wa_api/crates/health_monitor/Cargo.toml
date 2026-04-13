@@ -3,9 +3,6 @@ name = "health_monitor"
 version = "0.1.0"
 edition = "2021"
 
-[[bin]]
-name = "health_monitor"
-path = "src/main.rs"
 
 [dependencies]
 shared = { path = "../shared" }

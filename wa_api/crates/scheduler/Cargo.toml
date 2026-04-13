@@ -3,9 +3,6 @@ name = "scheduler"
 version = "0.1.0"
 edition = "2021"
 
-[[bin]]
-name = "scheduler"
-path = "src/main.rs"
 
 [dependencies]
 shared = { path = "../shared" }

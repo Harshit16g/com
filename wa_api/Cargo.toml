@@ -5,7 +5,7 @@ members = [
     "crates/worker",
     "crates/scheduler",
     "crates/pool_manager",
-    "crates/health_monitor",
+    "crates/health_monitor", "apps/api-core", "apps/worker-core",
 ]
 resolver = "2"
 

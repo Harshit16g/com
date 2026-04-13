@@ -3,9 +3,6 @@ name = "worker"
 version = "0.1.0"
 edition = "2021"
 
-[[bin]]
-name = "worker"
-path = "src/main.rs"
 
 [dependencies]
 shared = { path = "../shared" }

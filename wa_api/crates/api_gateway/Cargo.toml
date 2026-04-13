@@ -3,9 +3,6 @@ name = "api_gateway"
 version = "0.1.0"
 edition = "2021"
 
-[[bin]]
-name = "api_gateway"
-path = "src/main.rs"
 
 [dependencies]
 shared = { path = "../shared" }

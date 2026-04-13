@@ -12,11 +12,12 @@ use std::time::Duration;
 use tokio::time::sleep;
 use tracing::{error, info, warn};
 
-use crate::{rate_limiter, WorkerState};
+use crate::rate_limiter;
+use shared::state::AppState;
 
 const RETRY_DELAYS: [u64; 3] = [30, 120, 600]; // +30s, +2min, +10min
 
-pub async fn run_worker(worker_id: usize, state: Arc<WorkerState>) {
+pub async fn run_worker(worker_id: usize, state: Arc<AppState>) {
     info!(worker_id, "Worker started");
 
     loop {
@@ -52,7 +53,7 @@ pub async fn run_worker(worker_id: usize, state: Arc<WorkerState>) {
     }
 }
 
-async fn process_job(worker_id: usize, job: WhatsAppJob, state: Arc<WorkerState>) {
+async fn process_job(worker_id: usize, job: WhatsAppJob, state: Arc<AppState>) {
     let job_id = job.job_id;
     let instance = &job.instance_name.clone();
     let tenant_id = &job.tenant_id.to_string();

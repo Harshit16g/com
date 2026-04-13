@@ -10,28 +10,12 @@ use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilte
 mod auth;
 mod routes;
 mod services;
-mod state;
 
-use state::AppState;
 
-#[tokio::main]
-async fn main() -> Result<()> {
-    tracing_subscriber::registry()
-        .with(EnvFilter::try_from_default_env().unwrap_or_else(|_| "info".into()))
-        .with(
-            tracing_subscriber::fmt::layer()
-                .with_target(true)
-                .with_thread_ids(false)
-                .with_file(false)
-                .with_line_number(false)
-                .pretty(),
-        )
-        .init();
+use shared::state::AppState;
 
-    let config = shared::config::AppConfig::from_env()?;
-    let port = config.server_port;
-
-    let state = Arc::new(AppState::new(config).await?);
+pub async fn start_server(state: Arc<AppState>) -> Result<()> {
+    let port = state.config.server_port;
 
     let cors = CorsLayer::new()
         .allow_origin(Any)
@@ -69,7 +53,16 @@ async fn main() -> Result<()> {
     info!("wa_api gateway listening on {}", addr);
 
     let listener = tokio::net::TcpListener::bind(&addr).await?;
-    axum::serve(listener, app).await?;
+    axum::serve(listener, app)
+        .with_graceful_shutdown(shutdown_signal())
+        .await?;
 
+    info!("wa_api gateway shut down gracefully.");
     Ok(())
+}
+
+async fn shutdown_signal() {
+    tokio::signal::ctrl_c()
+        .await
+        .expect("failed to install CTRL+C handler");
 }

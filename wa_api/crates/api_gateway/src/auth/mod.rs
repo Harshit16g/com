@@ -11,7 +11,7 @@ use std::sync::Arc;
 use tracing::{error, warn};
 use uuid::Uuid;
 
-use crate::state::AppState;
+use shared::state::AppState;
 
 /// Extract x-api-key from request, resolve to TenantContext, inject into extensions.
 pub async fn auth_middleware(

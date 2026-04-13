@@ -11,7 +11,7 @@ use shared::types::TenantContext;
 use std::sync::Arc;
 use tracing::error;
 
-use crate::state::AppState;
+use shared::state::AppState;
 
 #[derive(Debug, Deserialize)]
 pub struct AnalyticsQuery {

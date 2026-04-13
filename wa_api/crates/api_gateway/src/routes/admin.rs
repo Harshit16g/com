@@ -11,7 +11,7 @@ use std::sync::Arc;
 use tracing::info;
 use uuid::Uuid;
 
-use crate::state::AppState;
+use shared::state::AppState;
 
 // ─── GET /admin/instances ─────────────────────────────────────────────────────
 

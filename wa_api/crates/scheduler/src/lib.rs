@@ -2,26 +2,14 @@ use anyhow::Result;
 use std::time::Duration;
 use tokio::time::sleep;
 use tracing::{error, info};
-use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
 
-use shared::{config::AppConfig, redis_client::RedisClient, utils::now_unix};
 
-#[tokio::main]
-async fn main() -> Result<()> {
-    tracing_subscriber::registry()
-        .with(EnvFilter::try_from_default_env().unwrap_or_else(|_| "info".into()))
-        .with(
-            tracing_subscriber::fmt::layer()
-                .with_target(true)
-                .with_thread_ids(false)
-                .with_file(false)
-                .with_line_number(false)
-                .pretty(),
-        )
-        .init();
+use shared::{redis_client::RedisClient, utils::now_unix};
+use shared::state::AppState;
+use std::sync::Arc;
 
-    let config = AppConfig::from_env()?;
-    let redis = RedisClient::new(&config.redis_url).await?;
+pub async fn start(state: Arc<AppState>) -> Result<()> {
+    let redis = &state.redis;
 
     info!("Scheduler started — 500ms tick");
 

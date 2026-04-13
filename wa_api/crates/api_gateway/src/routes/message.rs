@@ -13,7 +13,8 @@ use std::sync::Arc;
 use tracing::{error, info};
 use uuid::Uuid;
 
-use crate::{services::spam_guard, state::AppState};
+use crate::services::spam_guard;
+use shared::state::AppState;
 use shared::types::TenantContext;
 
 // ─── Request / Response ───────────────────────────────────────────────────────
