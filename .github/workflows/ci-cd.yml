@@ -68,8 +68,8 @@ jobs:
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
-          password: ${{ secrets.GHCR_TOKEN }}
-
+          password: ${{ secrets.GITHUB_TOKEN }}
+          
       - name: Lowercase repo name
         run: |
           echo "IMAGE_REPOSITORY=$(echo ${{ github.repository }} | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
