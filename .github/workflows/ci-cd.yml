@@ -1,0 +1,123 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME_PREFIX: ${{ github.repository_owner }}/leaex
+
+jobs:
+  rust-ci:
+    name: Rust CI (Lint & Test)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Rust toolchain
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          cache-work-dir: wa_api
+          
+      - name: Format Check
+        run: cargo fmt --all -- --check
+        working-directory: wa_api
+        
+      - name: Clippy Lint
+        run: cargo clippy -- -D warnings
+        working-directory: wa_api
+        
+      - name: Run Tests
+        run: cargo test
+        working-directory: wa_api
+
+  build-and-push:
+    name: Build & Push Docker Images
+    needs: rust-ci
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+      
+    strategy:
+      matrix:
+        include:
+          - service: api_gateway
+            dockerfile: wa_api/Dockerfile.gateway
+            context: wa_api
+          - service: worker
+            dockerfile: wa_api/Dockerfile.worker
+            context: wa_api
+          - service: scheduler
+            dockerfile: wa_api/Dockerfile.scheduler
+            context: wa_api
+          - service: pool_manager
+            dockerfile: wa_api/Dockerfile.pool
+            context: wa_api
+          - service: health_monitor
+            dockerfile: wa_api/Dockerfile.health
+            context: wa_api
+          - service: evolution_api
+            dockerfile: wa_api/Dockerfile.evo
+            context: evo
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Log in to the Container registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata (tags, labels) for Docker
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME_PREFIX }}-${{ matrix.service }}
+          tags: |
+            type=ref,event=branch
+            type=sha,format=long
+            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: ${{ matrix.context }}
+          file: ${{ matrix.dockerfile }}
+          push: true
+          tags: ${{ id.meta.outputs.tags }}
+          labels: ${{ id.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  deploy:
+    name: Deploy to Railway
+    needs: build-and-push
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        
+      - name: Install Railway CLI
+        run: curl -fsSL https://railway.app/install.sh | sh
+        
+      - name: Deploy Services
+        run: |
+          railway up --detach --service api_gateway
+          railway up --detach --service worker
+          railway up --detach --service scheduler
+          railway up --detach --service pool_manager
+          railway up --detach --service health_monitor
+          railway up --detach --service evolution_api
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}

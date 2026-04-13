@@ -1,0 +1,24 @@
+[package]
+name = "pool_manager"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "pool_manager"
+path = "src/main.rs"
+
+[dependencies]
+shared = { path = "../shared" }
+tokio = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+fred = { workspace = true }
+native-tls = { workspace = true }
+reqwest = { workspace = true }
+uuid = { workspace = true }
+chrono = { workspace = true }
+anyhow = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+dotenvy = { workspace = true }
+rand = { workspace = true }

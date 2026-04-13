@@ -1,0 +1,145 @@
+# ─── wa_api stack: API + Workers + Scheduler + Postgres + Redis ──────────────
+# Evolution API runs separately (see docker-compose.evo.yml or standalone).
+# Scale workers: docker compose up --scale worker=8
+
+services:
+
+  # ─── PostgreSQL (bundled, all wa_api data) ─────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: wa_api
+      POSTGRES_USER: wa_api
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-wa_api_secret}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./migrations/001_initial_schema.sql:/docker-entrypoint-initdb.d/001_initial_schema.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U wa_api -d wa_api"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  # ─── Redis (bundled, job queues + rate limiting + cache) ───────────────────
+  redis:
+    image: redis:7-alpine
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+  # ─── API Gateway ───────────────────────────────────────────────────────────
+  api_gateway:
+    image: ${DOCKER_REGISTRY:-ghcr.io}/${IMAGE_NAME_PREFIX:-harshit16g/leaex}-api_gateway:${IMAGE_TAG:-latest}
+    build:
+      context: .
+      dockerfile: Dockerfile.gateway
+    ports:
+      - "${GATEWAY_PORT:-8080}:8080"
+    environment:
+      DATABASE_URL: postgresql://wa_api:${POSTGRES_PASSWORD:-wa_api_secret}@postgres:5432/wa_api
+      REDIS_URL: redis://redis:6379
+      EVOLUTION_BASE_URL: ${EVOLUTION_BASE_URL}
+      EVOLUTION_API_KEY: ${EVOLUTION_API_KEY}
+      SERVER_PORT: "8080"
+      ADMIN_API_KEY: ${ADMIN_API_KEY}
+      ALERT_WEBHOOK_URL: ${ALERT_WEBHOOK_URL:-}
+      RUST_LOG: ${RUST_LOG:-info}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # ─── Worker (horizontally scalable) ───────────────────────────────────────
+  worker:
+    image: ${DOCKER_REGISTRY:-ghcr.io}/${IMAGE_NAME_PREFIX:-harshit16g/leaex}-worker:${IMAGE_TAG:-latest}
+    build:
+      context: .
+      dockerfile: Dockerfile.worker
+    deploy:
+      replicas: ${WORKER_REPLICAS:-4}
+    environment:
+      DATABASE_URL: postgresql://wa_api:${POSTGRES_PASSWORD:-wa_api_secret}@postgres:5432/wa_api
+      REDIS_URL: redis://redis:6379
+      EVOLUTION_BASE_URL: ${EVOLUTION_BASE_URL}
+      EVOLUTION_API_KEY: ${EVOLUTION_API_KEY}
+      WORKER_COUNT: "1"
+      MIN_SEND_DELAY_SECS: ${MIN_SEND_DELAY_SECS:-8}
+      MAX_SEND_DELAY_SECS: ${MAX_SEND_DELAY_SECS:-15}
+      RUST_LOG: ${RUST_LOG:-info}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # ─── Scheduler ─────────────────────────────────────────────────────────────
+  scheduler:
+    image: ${DOCKER_REGISTRY:-ghcr.io}/${IMAGE_NAME_PREFIX:-harshit16g/leaex}-scheduler:${IMAGE_TAG:-latest}
+    build:
+      context: .
+      dockerfile: Dockerfile.scheduler
+    environment:
+      DATABASE_URL: postgresql://wa_api:${POSTGRES_PASSWORD:-wa_api_secret}@postgres:5432/wa_api
+      REDIS_URL: redis://redis:6379
+      EVOLUTION_BASE_URL: ${EVOLUTION_BASE_URL}
+      EVOLUTION_API_KEY: ${EVOLUTION_API_KEY}
+      RUST_LOG: ${RUST_LOG:-info}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # ─── Pool Manager ──────────────────────────────────────────────────────────
+  pool_manager:
+    image: ${DOCKER_REGISTRY:-ghcr.io}/${IMAGE_NAME_PREFIX:-harshit16g/leaex}-pool_manager:${IMAGE_TAG:-latest}
+    build:
+      context: .
+      dockerfile: Dockerfile.pool
+    environment:
+      DATABASE_URL: postgresql://wa_api:${POSTGRES_PASSWORD:-wa_api_secret}@postgres:5432/wa_api
+      REDIS_URL: redis://redis:6379
+      EVOLUTION_BASE_URL: ${EVOLUTION_BASE_URL}
+      EVOLUTION_API_KEY: ${EVOLUTION_API_KEY}
+      RUST_LOG: ${RUST_LOG:-info}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # ─── Health Monitor ────────────────────────────────────────────────────────
+  health_monitor:
+    image: ${DOCKER_REGISTRY:-ghcr.io}/${IMAGE_NAME_PREFIX:-harshit16g/leaex}-health_monitor:${IMAGE_TAG:-latest}
+    build:
+      context: .
+      dockerfile: Dockerfile.health
+    environment:
+      DATABASE_URL: postgresql://wa_api:${POSTGRES_PASSWORD:-wa_api_secret}@postgres:5432/wa_api
+      REDIS_URL: redis://redis:6379
+      EVOLUTION_BASE_URL: ${EVOLUTION_BASE_URL}
+      EVOLUTION_API_KEY: ${EVOLUTION_API_KEY}
+      ALERT_WEBHOOK_URL: ${ALERT_WEBHOOK_URL:-}
+      RUST_LOG: ${RUST_LOG:-info}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  redis_data:

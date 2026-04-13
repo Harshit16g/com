@@ -1,0 +1,38 @@
+# Rust
+**/target/
+**/*.rs.bk
+
+# Node.js
+**/node_modules/
+**/dist/
+**/build/
+.npm
+.eslintcache
+
+# Environment / Secrets
+.env
+.env.*
+!.env.example
+
+# OS / Misc
+.DS_Store
+Thumbs.db
+*.log
+*.tmp
+*.bak
+
+# IDEs
+.vscode/
+.idea/
+.cursor/
+*.swp
+*.swo
+
+# Project specific
+wa_api/target/
+evo/node_modules/
+evo/dist/
+evolution_instances/
+postgres_data/
+redis_data/
+evo_postgres_data/
