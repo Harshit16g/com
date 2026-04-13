@@ -37,17 +37,17 @@ pub async fn start(state: Arc<AppState>) -> Result<()> {
     info!("Pool manager started — health check every 15 minutes");
 
     loop {
-        if let Err(e) = health_check_all(&redis, &evolution).await {
+        if let Err(e) = health_check_all(redis, evolution).await {
             error!("Pool health check error: {}", e);
         }
 
         // Update available set in Redis (used by api_gateway for routing)
-        if let Err(e) = refresh_available_set(&redis).await {
+        if let Err(e) = refresh_available_set(redis).await {
             error!("Pool available set refresh error: {}", e);
         }
 
         // Advance warmup counters (daily)
-        if let Err(e) = advance_warmup(&redis).await {
+        if let Err(e) = advance_warmup(redis).await {
             error!("Warmup advance error: {}", e);
         }
 
