@@ -23,7 +23,6 @@ RUN if [ -d "./Docker/scripts" ]; then \
     echo "No scripts directory found, skipping..."; \
     fi
 # Generate DB + build
-RUN ./Docker/scripts/generate_database.sh
 RUN npm run build
 
 # ─────────────────────────────────────────────
@@ -49,4 +48,4 @@ ENV DOCKER_ENV=true
 EXPOSE 8080
 
 # Start app (fail fast if script fails)
-CMD ["/bin/bash", "-c", "set -e; . ./Docker/scripts/deploy_database.sh && npm run start:prod"]
+CMD ["/bin/bash", "-c", "set -e; ./Docker/scripts/generate_database.sh && . ./Docker/scripts/deploy_database.sh && npm run start:prod"]
