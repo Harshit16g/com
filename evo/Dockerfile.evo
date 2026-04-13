@@ -48,6 +48,8 @@ WORKDIR /evo
 
 COPY --from=builder /evo/package.json ./package.json
 COPY --from=builder /evo/package-lock.json ./package-lock.json
+COPY --from=builder /evo/node_modules ./node_modules
+
 COPY --from=builder /evo/dist ./dist
 COPY --from=builder /evo/prisma ./prisma
 COPY --from=builder /evo/public ./public
@@ -56,7 +58,7 @@ COPY --from=builder /evo/Docker ./Docker
 COPY --from=builder /evo/runWithProvider.js ./runWithProvider.js
 
 # Install only production dependencies (no devDependencies)
-RUN npm ci --omit=dev --silent
+RUN npm prune --omit=dev --silent
 
 EXPOSE 8080
 
