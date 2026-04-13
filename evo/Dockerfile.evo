@@ -15,10 +15,13 @@ COPY . .
 
 # Install dependencies
 RUN npm ci --silent
-
+RUN ls -la ./Docker || true
 # Prepare scripts
-RUN chmod +x ./Docker/scripts/* && dos2unix ./Docker/scripts/*
-
+RUN if [ -d "./Docker/scripts" ]; then \
+    chmod +x ./Docker/scripts/* && dos2unix ./Docker/scripts/*; \
+    else \
+    echo "No scripts directory found, skipping..."; \
+    fi
 # Generate DB + build
 RUN ./Docker/scripts/generate_database.sh
 RUN npm run build
