@@ -1,12 +1,11 @@
-# Repo
+# ───────── Repo ─────────
 Baileys
-# compiled output
+
+# ───────── Build Output ─────────
 /dist
 /node_modules
 
-/Docker/.env
-
-# Logs
+# ───────── Logs ─────────
 logs/**.json
 *.log
 npm-debug.log*
@@ -15,14 +14,16 @@ yarn-debug.log*
 yarn-error.log*
 lerna-debug.log*
 
+# ───────── Docker Data ─────────
 /docker-compose-data
 /docker-data
 
-# Package
+# ───────── Package Locks (keep ONE, not all) ─────────
+# ⚠️ Recommend keeping package-lock.json if using npm
 /yarn.lock
 /pnpm-lock.yaml
 
-# IDEs
+# ───────── IDE ─────────
 .vscode/*
 !.vscode/settings.json
 !.vscode/tasks.json
@@ -31,18 +32,22 @@ lerna-debug.log*
 .nova/*
 .idea/*
 
-# Project related
+# ───────── Project Specific ─────────
 /instances/*
 !/instances/.gitkeep
 /test/
-/src/env.yml
 /store
-
-
 /temp/*
 
+# ───────── System ─────────
 .DS_Store
 *.DS_Store
 .tool-versions
 
+# ───────── Prisma ─────────
 /prisma/migrations/*
+
+# ───────── ENV FILES (IMPORTANT CHANGE) ─────────
+# Allow env files to be committed
+!.env
+!.env.*
