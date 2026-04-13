@@ -44,17 +44,17 @@ RUN apk add --no-cache tzdata ffmpeg bash openssl
 ENV TZ=America/Sao_Paulo
 ENV DOCKER_ENV=true
 
-WORKDIR /evolution
+WORKDIR /evo
 
-COPY --from=builder /evolution/package.json ./package.json
-COPY --from=builder /evolution/package-lock.json ./package-lock.json
-COPY --from=builder /evolution/dist ./dist
-COPY --from=builder /evolution/prisma ./prisma
-COPY --from=builder /evolution/manager ./manager
-COPY --from=builder /evolution/public ./public
-COPY --from=builder /evolution/.env ./.env
-COPY --from=builder /evolution/Docker ./Docker
-COPY --from=builder /evolution/runWithProvider.js ./runWithProvider.js
+COPY --from=builder /evo/package.json ./package.json
+COPY --from=builder /evo/package-lock.json ./package-lock.json
+COPY --from=builder /evo/dist ./dist
+COPY --from=builder /evo/prisma ./prisma
+COPY --from=builder /evo/manager ./manager
+COPY --from=builder /evo/public ./public
+COPY --from=builder /evo/.env ./.env
+COPY --from=builder /evo/Docker ./Docker
+COPY --from=builder /evo/runWithProvider.js ./runWithProvider.js
 
 # Install only production dependencies (no devDependencies)
 RUN npm ci --omit=dev --silent
