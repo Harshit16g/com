@@ -13,7 +13,7 @@ pub async fn start(state: Arc<AppState>) -> Result<()> {
     info!("Scheduler started — 500ms tick");
 
     loop {
-        if let Err(e) = tick(&redis).await {
+        if let Err(e) = tick(redis).await {
             error!("Scheduler tick error: {}", e);
         }
         sleep(Duration::from_millis(500)).await;

@@ -20,11 +20,11 @@ pub async fn start(state: Arc<AppState>) -> Result<()> {
     info!("Health monitor started — checking every 5 minutes");
 
     loop {
-        if let Err(e) = check_all_instances(&redis, &evolution, &supabase, &alert_url).await {
+        if let Err(e) = check_all_instances(redis, evolution, supabase, &alert_url).await {
             error!("Health monitor error: {}", e);
         }
 
-        if let Err(e) = reconcile_stale_messages(&redis, &evolution, &supabase).await {
+        if let Err(e) = reconcile_stale_messages(redis, evolution, supabase).await {
             error!("Reconciliation error: {}", e);
         }
 
