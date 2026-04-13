@@ -53,7 +53,7 @@ jobs:
           - service: worker-core
             dockerfile: wa_api/Dockerfile.worker-core
             context: wa_api
-          - service: evolution_api
+          - service: evo_api
             dockerfile: evo/Dockerfile.evo
             context: evo
 
@@ -116,6 +116,6 @@ jobs:
         run: |
           railway up --detach --service api-core
           railway up --detach --service worker-core
-          railway up --detach --service evolution_api
+          railway up --detach --service evo_api
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}

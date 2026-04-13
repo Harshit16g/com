@@ -15,14 +15,8 @@ COPY package*.json tsconfig.json tsup.config.ts ./
 
 RUN npm ci --silent
 
-# Copy the rest of the source
-COPY ./src ./src
-COPY ./public ./public
-COPY ./prisma ./prisma
-COPY ./manager ./manager
-COPY ./runWithProvider.js ./
-COPY ./.env.example ./.env
-COPY ./Docker ./Docker
+# Copy entire project (since context = evo/)
+COPY . .
 
 # Prepare scripts
 RUN if [ -d "./Docker/scripts" ]; then \
