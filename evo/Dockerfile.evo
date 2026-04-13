@@ -8,25 +8,21 @@ RUN sed -i 's|https://dl-cdn.alpinelinux.org|http://dl-cdn.alpinelinux.org|g' /e
     apk update && \
     apk add --no-cache git ffmpeg wget curl bash openssl dos2unix
 
-WORKDIR /evolution
+WORKDIR /evo
 
-COPY ./package*.json ./
-COPY ./tsconfig.json ./
-COPY ./tsup.config.ts ./
+# Copy entire project (since context = evo/)
+COPY . .
 
+# Install dependencies
 RUN npm ci --silent
+RUN ls -la ./Docker || true
+# Prepare scripts
+RUN if [ -d "./Docker/scripts" ]; then \
+    chmod +x ./Docker/scripts/* && dos2unix ./Docker/scripts/*; \
+    else \
+    echo "No scripts directory found, skipping..."; \
+    fi
 
-COPY ./src ./src
-COPY ./public ./public
-COPY ./prisma ./prisma
-COPY ./manager ./manager
-COPY ./.env.example ./.env
-COPY ./runWithProvider.js ./
-COPY ./Docker ./Docker
-
-RUN chmod +x ./Docker/scripts/* && dos2unix ./Docker/scripts/*
-
-RUN ./Docker/scripts/generate_database.sh
 
 RUN npm run build
 
