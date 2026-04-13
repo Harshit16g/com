@@ -10,12 +10,20 @@ RUN sed -i 's|https://dl-cdn.alpinelinux.org|http://dl-cdn.alpinelinux.org|g' /e
 
 WORKDIR /evo
 
-# Copy entire project (since context = evo/)
-COPY . .
+# Copy manifests first for better layer caching
+COPY package*.json tsconfig.json tsup.config.ts ./
 
-# Install dependencies
 RUN npm ci --silent
-RUN ls -la ./Docker || true
+
+# Copy the rest of the source
+COPY ./src ./src
+COPY ./public ./public
+COPY ./prisma ./prisma
+COPY ./manager ./manager
+COPY ./runWithProvider.js ./
+COPY ./.env.example ./.env
+COPY ./Docker ./Docker
+
 # Prepare scripts
 RUN if [ -d "./Docker/scripts" ]; then \
     chmod +x ./Docker/scripts/* && dos2unix ./Docker/scripts/*; \
@@ -23,6 +31,7 @@ RUN if [ -d "./Docker/scripts" ]; then \
     echo "No scripts directory found, skipping..."; \
     fi
 
+RUN ./Docker/scripts/generate_database.sh
 
 RUN npm run build
 
