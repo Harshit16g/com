@@ -14,6 +14,8 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./migrations/001_initial_schema.sql:/docker-entrypoint-initdb.d/001_initial_schema.sql:ro
+    networks:
+      - wa_api_shared_net
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U wa_api -d wa_api"]
       interval: 5s
@@ -27,6 +29,8 @@ services:
     command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
     volumes:
       - redis_data:/data
+    networks:
+      - wa_api_shared_net
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
@@ -42,6 +46,8 @@ services:
       dockerfile: Dockerfile.api-core
     ports:
       - "${GATEWAY_PORT:-8080}:8080"
+    networks:
+      - wa_api_shared_net
     environment:
       DATABASE_URL: postgresql://wa_api:${POSTGRES_PASSWORD:-wa_api_secret}@postgres:5432/wa_api
       REDIS_URL: redis://redis:6379
@@ -64,8 +70,8 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.worker-core
-    deploy:
-      replicas: ${WORKER_REPLICAS:-4}
+    networks:
+      - wa_api_shared_net
     environment:
       DATABASE_URL: postgresql://wa_api:${POSTGRES_PASSWORD:-wa_api_secret}@postgres:5432/wa_api
       REDIS_URL: redis://redis:6379
@@ -81,6 +87,10 @@ services:
       redis:
         condition: service_healthy
     restart: unless-stopped
+
+networks:
+  wa_api_shared_net:
+    name: wa_api_shared_net
 
 volumes:
   postgres_data:
