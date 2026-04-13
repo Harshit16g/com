@@ -18,6 +18,11 @@ RUN npm ci --silent
 # Copy entire project (since context = evo/)
 COPY . .
 
+COPY ./runWithProvider.js ./
+COPY ./.env.example ./.env
+COPY ./Docker ./Docker
+
+
 # Prepare scripts
 RUN if [ -d "./Docker/scripts" ]; then \
     chmod +x ./Docker/scripts/* && dos2unix ./Docker/scripts/*; \
