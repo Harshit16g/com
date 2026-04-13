@@ -3,6 +3,5 @@ node_modules
 .gitignore
 *.log
 .env
-dist
 coverage
 tmp
