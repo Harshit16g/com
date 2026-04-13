@@ -1,6 +1,9 @@
-.git
-*Dockerfile*
-*docker-compose*
-.env
 node_modules
+.git
+.gitignore
+Docker
+*.log
+.env
 dist
+coverage
+tmp

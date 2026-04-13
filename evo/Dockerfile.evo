@@ -1,0 +1,49 @@
+# ─────────────────────────────────────────────
+# Builder Stage
+# ─────────────────────────────────────────────
+FROM node:24-alpine AS builder
+
+# Fix Alpine TLS issues (CI stability)
+RUN sed -i 's|https://dl-cdn.alpinelinux.org|http://dl-cdn.alpinelinux.org|g' /etc/apk/repositories && \
+    apk update && \
+    apk add --no-cache git ffmpeg wget curl bash openssl dos2unix
+
+WORKDIR /evolution
+
+# Copy entire project (since context = evo/)
+COPY . .
+
+# Install dependencies
+RUN npm ci --silent
+
+# Prepare scripts
+RUN chmod +x ./Docker/scripts/* && dos2unix ./Docker/scripts/*
+
+# Generate DB + build
+RUN ./Docker/scripts/generate_database.sh
+RUN npm run build
+
+# ─────────────────────────────────────────────
+# Final Runtime Stage
+# ─────────────────────────────────────────────
+FROM node:24-alpine
+
+# Keep runtime minimal
+RUN sed -i 's|https://dl-cdn.alpinelinux.org|http://dl-cdn.alpinelinux.org|g' /etc/apk/repositories && \
+    apk update && \
+    apk add --no-cache tzdata ffmpeg bash openssl
+
+WORKDIR /evolution
+
+# Copy only built artifacts
+COPY --from=builder /evolution ./
+
+# Runtime env
+ENV TZ=America/Sao_Paulo
+ENV DOCKER_ENV=true
+
+# Expose port
+EXPOSE 8080
+
+# Start app (fail fast if script fails)
+CMD ["/bin/bash", "-c", "set -e; . ./Docker/scripts/deploy_database.sh && npm run start:prod"]

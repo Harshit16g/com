@@ -54,7 +54,7 @@ jobs:
             dockerfile: wa_api/Dockerfile.worker-core
             context: wa_api
           - service: evolution_api
-            dockerfile: wa_api/Dockerfile.evo
+            dockerfile: evo/Dockerfile.evo
             context: evo
 
     steps:
@@ -68,7 +68,7 @@ jobs:
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+          password: ${{ secrets.GHCR_TOKEN }}
 
       - name: Lowercase repo name
         run: |
