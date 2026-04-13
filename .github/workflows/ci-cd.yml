@@ -47,20 +47,11 @@ jobs:
     strategy:
       matrix:
         include:
-          - service: api_gateway
-            dockerfile: wa_api/Dockerfile.gateway
+          - service: api-core
+            dockerfile: wa_api/Dockerfile.api-core
             context: wa_api
-          - service: worker
-            dockerfile: wa_api/Dockerfile.worker
-            context: wa_api
-          - service: scheduler
-            dockerfile: wa_api/Dockerfile.scheduler
-            context: wa_api
-          - service: pool_manager
-            dockerfile: wa_api/Dockerfile.pool
-            context: wa_api
-          - service: health_monitor
-            dockerfile: wa_api/Dockerfile.health
+          - service: worker-core
+            dockerfile: wa_api/Dockerfile.worker-core
             context: wa_api
           - service: evolution_api
             dockerfile: wa_api/Dockerfile.evo
@@ -123,11 +114,8 @@ jobs:
         
       - name: Deploy Services
         run: |
-          railway up --detach --service api_gateway
-          railway up --detach --service worker
-          railway up --detach --service scheduler
-          railway up --detach --service pool_manager
-          railway up --detach --service health_monitor
+          railway up --detach --service api-core
+          railway up --detach --service worker-core
           railway up --detach --service evolution_api
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
