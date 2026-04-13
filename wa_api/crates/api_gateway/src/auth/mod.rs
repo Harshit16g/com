@@ -6,10 +6,7 @@ use axum::{
     response::Response,
 };
 use serde_json::json;
-use shared::{
-    types::TenantContext,
-    utils::sha256,
-};
+use shared::{types::TenantContext, utils::sha256};
 use std::sync::Arc;
 use tracing::{error, warn};
 use uuid::Uuid;
@@ -48,11 +45,7 @@ pub async fn auth_middleware(
     }
 
     // Cache miss — query DB
-    let agency = match state
-        .db
-        .get_agency_by_api_key_hash(&key_hash)
-        .await
-    {
+    let agency = match state.db.get_agency_by_api_key_hash(&key_hash).await {
         Ok(Some(a)) => a,
         Ok(None) => {
             warn!("Unknown API key attempted");
@@ -87,7 +80,10 @@ pub async fn auth_middleware(
         .and_then(|v| v.to_str().ok())
         .map(|s| s.to_string());
 
-    let tenant_id = match tenant_id_str.as_deref().and_then(|s| Uuid::parse_str(s).ok()) {
+    let tenant_id = match tenant_id_str
+        .as_deref()
+        .and_then(|s| Uuid::parse_str(s).ok())
+    {
         Some(id) => id,
         None => {
             return Err((
@@ -98,11 +94,7 @@ pub async fn auth_middleware(
     };
 
     // Get tenant row
-    let tenant = match state
-        .db
-        .get_tenant(&tenant_id, &agency.id)
-        .await
-    {
+    let tenant = match state.db.get_tenant(&tenant_id, &agency.id).await {
         Ok(Some(t)) => t,
         Ok(None) => {
             return Err((
@@ -135,7 +127,9 @@ pub async fn auth_middleware(
     if tenant.instance_status == "qr_required" && !is_setup_route {
         return Err((
             StatusCode::CONFLICT,
-            axum::Json(json!({"error": "WhatsApp instance needs re-authentication (QR scan required)", "code": "QR_REQUIRED"})),
+            axum::Json(
+                json!({"error": "WhatsApp instance needs re-authentication (QR scan required)", "code": "QR_REQUIRED"}),
+            ),
         ));
     }
 

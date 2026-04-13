@@ -25,8 +25,7 @@ pub struct PoolInstance {
 
 impl PoolInstance {
     pub fn is_active(&self) -> bool {
-        self.state == PoolNumberState::Active.to_string()
-            && self.daily_sent < self.daily_limit
+        self.state == PoolNumberState::Active.to_string() && self.daily_sent < self.daily_limit
     }
 }
 
@@ -45,7 +44,7 @@ async fn main() -> Result<()> {
         .init();
 
     let config = AppConfig::from_env()?;
-    let mut redis = RedisClient::new(&config.redis_url).await?;
+    let redis = RedisClient::new(&config.redis_url).await?;
     let evolution = EvolutionClient::new(&config.evolution_base_url, &config.evolution_api_key);
 
     info!("Pool manager started — health check every 15 minutes");
@@ -141,7 +140,11 @@ async fn refresh_available_set(redis: &RedisClient) -> Result<()> {
     }
 
     let active_count = instances.iter().filter(|i| i.is_active()).count();
-    info!("Pool available set refreshed: {}/{} active", active_count, instances.len());
+    info!(
+        "Pool available set refreshed: {}/{} active",
+        active_count,
+        instances.len()
+    );
 
     Ok(())
 }

@@ -4,11 +4,7 @@ use tokio::time::sleep;
 use tracing::{error, info};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
 
-use shared::{
-    config::AppConfig,
-    redis_client::RedisClient,
-    utils::now_unix,
-};
+use shared::{config::AppConfig, redis_client::RedisClient, utils::now_unix};
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -25,7 +21,7 @@ async fn main() -> Result<()> {
         .init();
 
     let config = AppConfig::from_env()?;
-    let mut redis = RedisClient::new(&config.redis_url).await?;
+    let redis = RedisClient::new(&config.redis_url).await?;
 
     info!("Scheduler started — 500ms tick");
 

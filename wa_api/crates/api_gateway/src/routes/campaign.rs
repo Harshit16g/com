@@ -138,10 +138,10 @@ async fn start_campaign(
         let phone_hash = shared::utils::hash_phone(phone);
 
         // Weekly spam guard check at job creation
-        let week_count = match redis.spam_guard_get_week(&phone_hash).await {
-            Ok(c) => c,
-            Err(_) => 0,
-        };
+        let week_count = redis
+            .spam_guard_get_week(&phone_hash)
+            .await
+            .unwrap_or_default();
         if week_count >= spam_guard::WEEKLY_LIMIT {
             spam_dropped += 1;
             continue;
@@ -188,7 +188,9 @@ async fn start_campaign(
 
         // Enqueue: scheduled or immediate
         let result = if scheduled_at <= Utc::now() {
-            redis.lpush_ready(&ctx.tenant_id.to_string(), &job_json).await
+            redis
+                .lpush_ready(&ctx.tenant_id.to_string(), &job_json)
+                .await
         } else {
             redis
                 .zadd_scheduled(
@@ -257,15 +259,20 @@ async fn list_campaigns(
     match sqlx::query_as::<_, CampaignRow>(
         "SELECT id, name, template_name, status, total_recipients, sent_count, \
          delivered_count, failed_count, deferred_count, started_at, completed_at, created_at \
-         FROM wa_campaigns WHERE tenant_id = $1 ORDER BY created_at DESC LIMIT 50"
+         FROM wa_campaigns WHERE tenant_id = $1 ORDER BY created_at DESC LIMIT 50",
     )
     .bind(ctx.tenant_id)
     .fetch_all(state.db.pool())
-    .await {
+    .await
+    {
         Ok(rows) => (StatusCode::OK, Json(serde_json::json!({"campaigns": rows}))).into_response(),
         Err(e) => {
             tracing::error!("Failed to list campaigns: {}", e);
-            (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": "Database error"}))).into_response()
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({"error": "Database error"})),
+            )
+                .into_response()
         }
     }
 }
@@ -328,9 +335,7 @@ async fn cancel_campaign(
 ) -> impl IntoResponse {
     info!(campaign_id = %campaign_id, tenant_id = %ctx.tenant_id, "Campaign cancel requested");
     let redis = state.redis.clone();
-    let _ = redis
-        .campaigns_remove_active(&campaign_id)
-        .await;
+    let _ = redis.campaigns_remove_active(&campaign_id).await;
     (
         StatusCode::OK,
         Json(json!({"campaign_id": campaign_id, "status": "cancelled"})),

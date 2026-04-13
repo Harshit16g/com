@@ -40,9 +40,7 @@ pub fn idempotency_key(
     template_hash: &str,
     campaign_id: Option<&Uuid>,
 ) -> String {
-    let campaign_str = campaign_id
-        .map(|id| id.to_string())
-        .unwrap_or_default();
+    let campaign_str = campaign_id.map(|id| id.to_string()).unwrap_or_default();
     sha256(&format!(
         "{}{}{}{}",
         tenant_id, phone, template_hash, campaign_str

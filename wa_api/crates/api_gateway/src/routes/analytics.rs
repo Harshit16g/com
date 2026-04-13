@@ -61,7 +61,7 @@ async fn messages_analytics(
     // Build optional filters
     let status_filter = params.status.as_deref().unwrap_or("");
     let mut type_filter = params.message_type.as_deref().unwrap_or("").to_string();
-    
+
     // UI might send 'crm' but DB uses 'manual_crm'
     if type_filter == "crm" {
         type_filter = "manual_crm".to_string();
@@ -75,7 +75,7 @@ async fn messages_analytics(
            AND ($2 = '' OR status = $2) \
            AND ($3 = '' OR message_type = $3) \
          ORDER BY created_at DESC \
-         LIMIT $4 OFFSET $5"
+         LIMIT $4 OFFSET $5",
     )
     .bind(ctx.tenant_id)
     .bind(status_filter)
@@ -95,7 +95,7 @@ async fn messages_analytics(
           COUNT(*) FILTER (WHERE status = 'deferred_spam') as deferred_today, \
           COUNT(*) FILTER (WHERE message_type = 'inbound') as inbound_today \
          FROM wa_interaction_log \
-         WHERE tenant_id = $1 AND created_at >= CURRENT_DATE"
+         WHERE tenant_id = $1 AND created_at >= CURRENT_DATE",
     )
     .bind(ctx.tenant_id)
     .fetch_optional(state.db.pool())
@@ -131,28 +131,36 @@ async fn messages_analytics(
                 "—".to_string()
             };
 
-            (StatusCode::OK, Json(json!({
-                "tenant_id": ctx.tenant_id,
-                "page": page,
-                "limit": limit,
-                "messages": messages,
-                "summary": {
-                    "total_today": s_ref.map(|d| d.total_today).unwrap_or(0),
-                    "sent_today": sent,
-                    "delivered_today": delivered,
-                    "failed_today": s_ref.map(|d| d.failed_today).unwrap_or(0),
-                    "deferred_today": s_ref.map(|d| d.deferred_today).unwrap_or(0),
-                    "inbound_today": inbound,
-                    "delivery_rate": delivery_rate,
-                    "ack_rate": ack_rate,
-                    "response_rate": response_rate,
-                    "followup_rate": followup_rate,
-                }
-            }))).into_response()
+            (
+                StatusCode::OK,
+                Json(json!({
+                    "tenant_id": ctx.tenant_id,
+                    "page": page,
+                    "limit": limit,
+                    "messages": messages,
+                    "summary": {
+                        "total_today": s_ref.map(|d| d.total_today).unwrap_or(0),
+                        "sent_today": sent,
+                        "delivered_today": delivered,
+                        "failed_today": s_ref.map(|d| d.failed_today).unwrap_or(0),
+                        "deferred_today": s_ref.map(|d| d.deferred_today).unwrap_or(0),
+                        "inbound_today": inbound,
+                        "delivery_rate": delivery_rate,
+                        "ack_rate": ack_rate,
+                        "response_rate": response_rate,
+                        "followup_rate": followup_rate,
+                    }
+                })),
+            )
+                .into_response()
         }
         (Err(e), _) | (_, Err(e)) => {
             error!("Analytics query error: {}", e);
-            (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": "Database error"}))).into_response()
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({"error": "Database error"})),
+            )
+                .into_response()
         }
     }
 }

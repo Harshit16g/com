@@ -1,4 +1,7 @@
-use shared::{redis_client::RedisClient, utils::{hash_id, hash_phone}};
+use shared::{
+    redis_client::RedisClient,
+    utils::{hash_id, hash_phone},
+};
 use uuid::Uuid;
 
 /// Platform-wide daily limit (across ALL partners to same number)
@@ -63,7 +66,10 @@ pub async fn check(
         });
     }
 
-    Ok(SpamGuardResult { allowed: true, reason: None })
+    Ok(SpamGuardResult {
+        allowed: true,
+        reason: None,
+    })
 }
 
 /// Increment spam guard counters after a successful send.
@@ -80,8 +86,12 @@ pub async fn record_send(
 
     redis.spam_guard_incr_today(&phone_hash).await?;
     redis.spam_guard_incr_week(&phone_hash).await?;
-    redis.incr_partner_daily(&tenant_id_str, &phone_hash).await?;
-    redis.spam_guard_add_partner_today(&phone_hash, &partner_hash).await?;
+    redis
+        .incr_partner_daily(&tenant_id_str, &phone_hash)
+        .await?;
+    redis
+        .spam_guard_add_partner_today(&phone_hash, &partner_hash)
+        .await?;
 
     Ok(())
 }

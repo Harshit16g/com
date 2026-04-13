@@ -1,13 +1,11 @@
 use anyhow::Result;
 use shared::{
-    config::AppConfig,
-    db::DbClient,
-    evolution::EvolutionClient,
-    redis_client::RedisClient,
+    config::AppConfig, db::DbClient, evolution::EvolutionClient, redis_client::RedisClient,
 };
 
 #[derive(Clone)]
 pub struct AppState {
+    #[allow(dead_code)]
     pub config: AppConfig,
     pub redis: RedisClient,
     pub db: DbClient,
@@ -20,6 +18,11 @@ impl AppState {
         let db = DbClient::new(&config.database_url).await?;
         let evolution = EvolutionClient::new(&config.evolution_base_url, &config.evolution_api_key);
 
-        Ok(AppState { config, redis, db, evolution })
+        Ok(AppState {
+            config,
+            redis,
+            db,
+            evolution,
+        })
     }
 }

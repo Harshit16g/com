@@ -7,10 +7,7 @@ mod processor;
 mod rate_limiter;
 
 use shared::{
-    config::AppConfig,
-    db::DbClient,
-    evolution::EvolutionClient,
-    redis_client::RedisClient,
+    config::AppConfig, db::DbClient, evolution::EvolutionClient, redis_client::RedisClient,
 };
 
 #[derive(Clone)]

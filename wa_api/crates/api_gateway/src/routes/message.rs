@@ -1,9 +1,6 @@
 use axum::{
-    extract::State,
-    http::StatusCode,
-    response::IntoResponse,
-    routing::post,
-    Extension, Json, Router,
+    extract::State, http::StatusCode, response::IntoResponse, routing::post, Extension, Json,
+    Router,
 };
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
@@ -93,28 +90,22 @@ async fn send_message(
     // ── 2. Check opt-out ───────────────────────────────────────────────────
     let phone_hash = shared::utils::hash_phone(&req.phone);
 
-    match state.db.is_opted_out_platform(&phone_hash).await {
-        Ok(true) => {
-            return (
-                StatusCode::OK,
-                Json(json!({
-                    "status": "blocked_optout",
-                    "message": "Recipient has opted out platform-wide"
-                })),
-            )
-                .into_response();
-        }
-        Err(e) => {
-            error!("Opt-out check failed: {}", e);
-            // Don't block on opt-out check failure — proceed
-        }
-        _ => {}
+    if let Ok(true) = state.db.is_opted_out_platform(&phone_hash).await {
+        return (
+            StatusCode::OK,
+            Json(json!({
+                "status": "blocked_optout",
+                "message": "Recipient has opted out platform-wide"
+            })),
+        )
+            .into_response();
     }
 
     // ── 3. Spam guard ──────────────────────────────────────────────────────
     let redis = state.redis.clone();
-    match spam_guard::check(&redis, &req.phone, &ctx.tenant_id, &ctx.partner_id).await {
-        Ok(result) if !result.allowed => {
+    if let Ok(result) = spam_guard::check(&redis, &req.phone, &ctx.tenant_id, &ctx.partner_id).await
+    {
+        if !result.allowed {
             return (
                 StatusCode::OK,
                 Json(json!({
@@ -124,11 +115,6 @@ async fn send_message(
             )
                 .into_response();
         }
-        Err(e) => {
-            error!("Spam guard check error: {}", e);
-            // Don't block on spam guard failure
-        }
-        _ => {}
     }
 
     // ── 4. Build job ───────────────────────────────────────────────────────
@@ -139,15 +125,15 @@ async fn send_message(
     let idem_key = idempotency_key(&ctx.tenant_id, &req.phone, &t_hash, None);
 
     // Check idempotency — don't re-enqueue duplicate
-    match redis.is_already_sent(&idem_key).await {
-        Ok(true) => {
-            return (
-                StatusCode::OK,
-                Json(json!({"status": "duplicate", "message": "Message already sent or enqueued"})),
-            )
-                .into_response();
-        }
-        _ => {}
+    if let Ok(true) = redis.is_already_sent(&idem_key).await {
+        return (
+            StatusCode::OK,
+            Json(json!({
+                "status": "duplicate",
+                "message": "Message already sent or enqueued"
+            })),
+        )
+            .into_response();
     }
 
     let job_id = Uuid::new_v4();

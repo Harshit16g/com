@@ -105,17 +105,18 @@ impl EvolutionClient {
         phone: &str,
         text: &str,
     ) -> Result<String, EvolutionError> {
-        let url = format!(
-            "{}/message/sendText/{}",
-            self.base_url, instance_name
-        );
+        let url = format!("{}/message/sendText/{}", self.base_url, instance_name);
 
         let body = SendTextRequest {
             number: phone.to_string(),
             text: text.to_string(),
         };
 
-        debug!("Sending text via instance={} to={}", instance_name, &phone[..4]);
+        debug!(
+            "Sending text via instance={} to={}",
+            instance_name,
+            &phone[..4]
+        );
 
         let resp = self
             .client
@@ -124,13 +125,7 @@ impl EvolutionClient {
             .json(&body)
             .send()
             .await
-            .map_err(|e| {
-                if e.is_timeout() || e.is_connect() {
-                    EvolutionError::Transient(e.to_string())
-                } else {
-                    EvolutionError::Transient(e.to_string())
-                }
-            })?;
+            .map_err(|e| EvolutionError::Transient(e.to_string()))?;
 
         let status = resp.status();
 
@@ -141,7 +136,9 @@ impl EvolutionClient {
                 .and_then(|v| v.to_str().ok())
                 .and_then(|s| s.parse().ok())
                 .unwrap_or(60);
-            return Err(EvolutionError::RateLimit { retry_after_secs: retry_after });
+            return Err(EvolutionError::RateLimit {
+                retry_after_secs: retry_after,
+            });
         }
 
         if status.is_server_error() {
@@ -152,26 +149,41 @@ impl EvolutionClient {
             )));
         }
 
-        let body_text = resp.text().await.map_err(|e| EvolutionError::Transient(e.to_string()))?;
+        let body_text = resp
+            .text()
+            .await
+            .map_err(|e| EvolutionError::Transient(e.to_string()))?;
 
         // Check for known error strings in response body
         let lower = body_text.to_lowercase();
-        if lower.contains("qr_required") || lower.contains("auth_failed") || lower.contains("unauthorized") {
+        if lower.contains("qr_required")
+            || lower.contains("auth_failed")
+            || lower.contains("unauthorized")
+        {
             return Err(EvolutionError::AuthRequired(body_text));
         }
         if lower.contains("banned") || lower.contains("account_restricted") {
             return Err(EvolutionError::Banned(body_text));
         }
-        if lower.contains("invalid_number") || lower.contains("not_on_whatsapp") || lower.contains("not registered") {
+        if lower.contains("invalid_number")
+            || lower.contains("not_on_whatsapp")
+            || lower.contains("not registered")
+        {
             return Err(EvolutionError::InvalidRecipient(body_text));
         }
-        if lower.contains("instance_not_found") || lower.contains("session_closed") || lower.contains("disconnected") {
+        if lower.contains("instance_not_found")
+            || lower.contains("session_closed")
+            || lower.contains("disconnected")
+        {
             return Err(EvolutionError::InstanceDisconnected(body_text));
         }
 
         // Parse message ID from response
         let send_resp: SendResponse = serde_json::from_str(&body_text).map_err(|e| {
-            EvolutionError::Transient(format!("Failed to parse response: {} body={}", e, body_text))
+            EvolutionError::Transient(format!(
+                "Failed to parse response: {} body={}",
+                e, body_text
+            ))
         })?;
 
         let msg_id = send_resp
@@ -197,7 +209,10 @@ impl EvolutionClient {
             .await?;
 
         if !resp.status().is_success() {
-            return Err(anyhow!("HTTP {} from Evolution health check", resp.status()));
+            return Err(anyhow!(
+                "HTTP {} from Evolution health check",
+                resp.status()
+            ));
         }
 
         let body: serde_json::Value = resp.json().await?;
@@ -222,7 +237,10 @@ impl EvolutionClient {
             .await?;
 
         if !resp.status().is_success() {
-            return Err(anyhow!("HTTP {} from Evolution fetchInstances", resp.status()));
+            return Err(anyhow!(
+                "HTTP {} from Evolution fetchInstances",
+                resp.status()
+            ));
         }
 
         Ok(resp.json().await?)
@@ -249,7 +267,11 @@ impl EvolutionClient {
         let status = resp.status();
         let body: serde_json::Value = resp.json().await.unwrap_or_default();
         if !status.is_success() {
-            return Err(anyhow!("Evolution create_instance HTTP {}: {}", status, body));
+            return Err(anyhow!(
+                "Evolution create_instance HTTP {}: {}",
+                status,
+                body
+            ));
         }
         Ok(body)
     }
@@ -276,13 +298,15 @@ impl EvolutionClient {
         }
 
         // Evolution API v2 shape: { base64, code } or { qrcode: { base64, code } }
-        let base64 = body.get("base64")
+        let base64 = body
+            .get("base64")
             .or_else(|| body.pointer("/qrcode/base64"))
             .and_then(|v| v.as_str())
             .ok_or_else(|| anyhow!("No base64 in QR response — instance may already be connected"))?
             .to_string();
 
-        let code = body.get("code")
+        let code = body
+            .get("code")
             .or_else(|| body.pointer("/qrcode/code"))
             .and_then(|v| v.as_str())
             .map(|s| s.to_string());

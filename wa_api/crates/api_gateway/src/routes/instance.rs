@@ -1,9 +1,5 @@
 use axum::{
-    extract::State,
-    http::StatusCode,
-    response::IntoResponse,
-    routing::get,
-    Extension, Json, Router,
+    extract::State, http::StatusCode, response::IntoResponse, routing::get, Extension, Json, Router,
 };
 use serde_json::json;
 use shared::types::TenantContext;
@@ -46,11 +42,7 @@ async fn instance_qr(
                     .into_response();
             }
             error!("QR fetch error for {}: {}", ctx.instance_name, msg);
-            (
-                StatusCode::BAD_GATEWAY,
-                Json(json!({ "error": msg })),
-            )
-                .into_response()
+            (StatusCode::BAD_GATEWAY, Json(json!({ "error": msg }))).into_response()
         }
     }
 }

@@ -29,13 +29,11 @@ struct TenantListRow {
 }
 
 /// GET /admin/instances — full list of all provisioned tenants with live status from Redis.
-async fn admin_list_instances(
-    State(state): State<Arc<AppState>>,
-) -> impl IntoResponse {
+async fn admin_list_instances(State(state): State<Arc<AppState>>) -> impl IntoResponse {
     let rows = sqlx::query_as::<_, TenantListRow>(
         "SELECT id, agency_id, partner_id, instance_name, wa_number, \
          instance_status, daily_crm_limit, campaign_enabled, created_at \
-         FROM tenants ORDER BY created_at DESC"
+         FROM tenants ORDER BY created_at DESC",
     )
     .fetch_all(state.db.pool())
     .await;
@@ -132,13 +130,12 @@ async fn admin_create_instance(
     Json(req): Json<CreateInstanceRequest>,
 ) -> impl IntoResponse {
     // 1. Check the instance doesn't already exist in our DB
-    let existing: Option<(String,)> = sqlx::query_as(
-        "SELECT instance_name FROM tenants WHERE instance_name = $1 LIMIT 1"
-    )
-    .bind(&req.instance_name)
-    .fetch_optional(state.db.pool())
-    .await
-    .unwrap_or(None);
+    let existing: Option<(String,)> =
+        sqlx::query_as("SELECT instance_name FROM tenants WHERE instance_name = $1 LIMIT 1")
+            .bind(&req.instance_name)
+            .fetch_optional(state.db.pool())
+            .await
+            .unwrap_or(None);
 
     if existing.is_some() {
         return (

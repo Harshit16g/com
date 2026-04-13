@@ -1,11 +1,11 @@
 use chrono::Utc;
 use serde_json::json;
 use shared::{
+    db::{DbClient, InteractionLogInsert},
     evolution::EvolutionError,
     redis_client::RedisClient,
-    db::{DbClient, InteractionLogInsert},
     types::{InstanceHealth, JobStatus, MessagePayload, WhatsAppJob},
-    utils::{hash_phone, mask_phone, now_unix_i64},
+    utils::{hash_phone, now_unix_i64},
 };
 use std::sync::Arc;
 use std::time::Duration;
@@ -30,23 +30,17 @@ pub async fn run_worker(worker_id: usize, state: Arc<WorkerState>) {
         };
 
         // BRPOP with 1s timeout
-        let job_result = state
-            .redis
-            .clone()
-            .brpop_ready(&tenant_ids, 1.0)
-            .await;
+        let job_result = state.redis.clone().brpop_ready(&tenant_ids, 1.0).await;
 
         match job_result {
-            Ok(Some((_, job_json))) => {
-                match serde_json::from_str::<WhatsAppJob>(&job_json) {
-                    Ok(job) => {
-                        process_job(worker_id, job, Arc::clone(&state)).await;
-                    }
-                    Err(e) => {
-                        error!(worker_id, "Failed to deserialize job: {}", e);
-                    }
+            Ok(Some((_, job_json))) => match serde_json::from_str::<WhatsAppJob>(&job_json) {
+                Ok(job) => {
+                    process_job(worker_id, job, Arc::clone(&state)).await;
                 }
-            }
+                Err(e) => {
+                    error!(worker_id, "Failed to deserialize job: {}", e);
+                }
+            },
             Ok(None) => {
                 // Timeout — no jobs, continue
             }
@@ -70,7 +64,7 @@ async fn process_job(worker_id: usize, job: WhatsAppJob, state: Arc<WorkerState>
         "Processing job"
     );
 
-    let mut redis = state.redis.clone();
+    let redis = state.redis.clone();
 
     // ── Step 1: Instance health check ─────────────────────────────────────
     let health = redis
@@ -114,7 +108,7 @@ async fn process_job(worker_id: usize, job: WhatsAppJob, state: Arc<WorkerState>
 
     // ── Step 3: Rate limit delay ───────────────────────────────────────────
     rate_limiter::enforce_delay(
-        &mut redis,
+        &redis,
         instance,
         state.config.min_send_delay_secs,
         state.config.max_send_delay_secs,
@@ -147,14 +141,11 @@ async fn process_job(worker_id: usize, job: WhatsAppJob, state: Arc<WorkerState>
     }
 
     // ── Step 6: Idempotency check ─────────────────────────────────────────
-    match redis.is_already_sent(&job.idempotency_key).await {
-        Ok(true) => {
-            info!(job_id = %job_id, "Duplicate send detected — skipping");
-            persist_status(&state.db, &job, JobStatus::Duplicate, None, None).await;
-            let _ = redis.del(&lock_key).await;
-            return;
-        }
-        _ => {}
+    if let Ok(true) = redis.is_already_sent(&job.idempotency_key).await {
+        info!(job_id = %job_id, "Duplicate send detected — skipping");
+        persist_status(&state.db, &job, JobStatus::Duplicate, None, None).await;
+        let _ = redis.del(&lock_key).await;
+        return;
     }
 
     // ── Step 7: Send via Evolution API ────────────────────────────────────
@@ -186,26 +177,19 @@ async fn process_job(worker_id: usize, job: WhatsAppJob, state: Arc<WorkerState>
             let _ = redis.spam_guard_incr_week(&phone_hash).await;
             let _ = redis.incr_partner_daily(tenant_id, &phone_hash).await;
             let _ = redis
-                .spam_guard_add_partner_today(
-                    &phone_hash,
-                    &shared::utils::hash_id(&job.partner_id),
-                )
+                .spam_guard_add_partner_today(&phone_hash, &shared::utils::hash_id(&job.partner_id))
                 .await;
 
-            persist_status(
-                &state.db,
-                &job,
-                JobStatus::Sent,
-                Some(msg_id),
-                None,
-            )
-            .await;
+            persist_status(&state.db, &job, JobStatus::Sent, Some(msg_id), None).await;
         }
 
         Err(e @ (EvolutionError::Transient(_) | EvolutionError::RateLimit { .. })) => {
             let retry_after = match &e {
                 EvolutionError::RateLimit { retry_after_secs } => *retry_after_secs,
-                _ => RETRY_DELAYS.get(job.retry_count as usize).copied().unwrap_or(600),
+                _ => RETRY_DELAYS
+                    .get(job.retry_count as usize)
+                    .copied()
+                    .unwrap_or(600),
             };
 
             if job.retry_count >= 3 {
@@ -341,7 +325,11 @@ async fn persist_status(
         error_reason,
         retry_count: job.retry_count as i16,
         scheduled_at: job.scheduled_at,
-        sent_at: if status == JobStatus::Sent { Some(Utc::now()) } else { None },
+        sent_at: if status == JobStatus::Sent {
+            Some(Utc::now())
+        } else {
+            None
+        },
         idempotency_key: job.idempotency_key.clone(),
     };
 

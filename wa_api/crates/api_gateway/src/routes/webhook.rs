@@ -1,10 +1,4 @@
-use axum::{
-    extract::State,
-    http::StatusCode,
-    response::IntoResponse,
-    routing::post,
-    Json, Router,
-};
+use axum::{extract::State, http::StatusCode, response::IntoResponse, routing::post, Json, Router};
 use serde::Deserialize;
 use serde_json::json;
 use shared::utils::hash_phone;
@@ -50,7 +44,9 @@ async fn evolution_webhook(
                     _ => return (StatusCode::OK, Json(json!({"ok": true}))).into_response(),
                 };
 
-                let delivered_at = if delivery_status == shared::types::JobStatus::Delivered || delivery_status == shared::types::JobStatus::Read {
+                let delivered_at = if delivery_status == shared::types::JobStatus::Delivered
+                    || delivery_status == shared::types::JobStatus::Read
+                {
                     Some(chrono::Utc::now())
                 } else {
                     None
@@ -70,12 +66,28 @@ async fn evolution_webhook(
             if let (Some(instance), Some(data)) = (&payload.instance, &payload.data) {
                 let messages = data.as_array().cloned().unwrap_or_default();
                 for msg in &messages {
-                    let from_me = msg.get("key").and_then(|k| k.get("fromMe")).and_then(|v| v.as_bool()).unwrap_or(false);
-                    
+                    let from_me = msg
+                        .get("key")
+                        .and_then(|k| k.get("fromMe"))
+                        .and_then(|v| v.as_bool())
+                        .unwrap_or(false);
+
                     // Extract phone from JID (format: 919XXXXXXXXXX@s.whatsapp.net)
-                    let from_jid = msg.get("key").and_then(|k| k.get("remoteJid")).and_then(|j| j.as_str()).unwrap_or("");
-                    let phone = from_jid.split('@').next().map(|s| format!("+{}", s)).unwrap_or_default();
-                    let msg_id = msg.get("key").and_then(|k| k.get("id")).and_then(|v| v.as_str()).unwrap_or("");
+                    let from_jid = msg
+                        .get("key")
+                        .and_then(|k| k.get("remoteJid"))
+                        .and_then(|j| j.as_str())
+                        .unwrap_or("");
+                    let phone = from_jid
+                        .split('@')
+                        .next()
+                        .map(|s| format!("+{}", s))
+                        .unwrap_or_default();
+                    let msg_id = msg
+                        .get("key")
+                        .and_then(|k| k.get("id"))
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("");
 
                     if from_me || phone.is_empty() || msg_id.is_empty() {
                         continue;
@@ -83,7 +95,10 @@ async fn evolution_webhook(
 
                     let body = msg
                         .get("message")
-                        .and_then(|m| m.get("conversation").or_else(|| m.pointer("/extendedTextMessage/text")))
+                        .and_then(|m| {
+                            m.get("conversation")
+                                .or_else(|| m.pointer("/extendedTextMessage/text"))
+                        })
                         .and_then(|c| c.as_str())
                         .unwrap_or("")
                         .trim();
@@ -93,7 +108,7 @@ async fn evolution_webhook(
                         let tenant_id = tenant.id;
                         let phone_hash = hash_phone(&phone);
                         let push_name = msg.get("pushName").and_then(|v| v.as_str());
-                        
+
                         let log = shared::db::InteractionLogInsert {
                             tenant_id,
                             campaign_id: None,
@@ -118,7 +133,10 @@ async fn evolution_webhook(
                     if upper_body == "STOP" || upper_body == "UNSUBSCRIBE" {
                         let phone_hash = hash_phone(&phone);
                         info!(phone_hash = %phone_hash, "STOP keyword received — opting out platform-wide");
-                        let _ = state.db.upsert_opt_out(&phone_hash, None, "stop_keyword").await;
+                        let _ = state
+                            .db
+                            .upsert_opt_out(&phone_hash, None, "stop_keyword")
+                            .await;
                     }
                 }
             }
@@ -156,23 +174,32 @@ async fn evolution_webhook(
                     };
 
                     for contact in contacts {
-                        let jid = contact.get("id").and_then(|v| v.as_str())
+                        let jid = contact
+                            .get("id")
+                            .and_then(|v| v.as_str())
                             .or_else(|| contact.get("remoteJid").and_then(|v| v.as_str()))
                             .unwrap_or("");
-                        let name = contact.get("name").and_then(|v| v.as_str())
+                        let name = contact
+                            .get("name")
+                            .and_then(|v| v.as_str())
                             .or_else(|| contact.get("pushName").and_then(|v| v.as_str()))
                             .or_else(|| contact.get("verifiedName").and_then(|v| v.as_str()));
                         let pic = contact.get("profilePicUrl").and_then(|v| v.as_str());
 
                         if !jid.is_empty() {
-                            let phone = jid.split('@').next().map(|s| format!("+{}", s)).unwrap_or_default();
+                            let phone = jid
+                                .split('@')
+                                .next()
+                                .map(|s| format!("+{}", s))
+                                .unwrap_or_default();
                             if !phone.is_empty() {
                                 // 1. Backfill name in interaction log
                                 if let Some(n) = name {
                                     let _ = state.db.update_interaction_name(&phone, n).await;
                                 }
                                 // 2. Upsert to wa_contacts for presence/profile pic support
-                                let _ = state.db.upsert_contact(&tenant.id, &phone, name, pic).await;
+                                let _ =
+                                    state.db.upsert_contact(&tenant.id, &phone, name, pic).await;
                             }
                         }
                     }
@@ -182,12 +209,18 @@ async fn evolution_webhook(
 
         "send.message" => {
             if let Some(data) = &payload.data {
-                let msg_id = data.get("key").and_then(|k| k.get("id")).and_then(|v| v.as_str())
+                let msg_id = data
+                    .get("key")
+                    .and_then(|k| k.get("id"))
+                    .and_then(|v| v.as_str())
                     .or_else(|| data.get("messageId").and_then(|v| v.as_str()))
                     .unwrap_or("");
-                
+
                 if !msg_id.is_empty() {
-                    let _ = state.db.update_interaction_status(msg_id, "sent", None).await;
+                    let _ = state
+                        .db
+                        .update_interaction_status(msg_id, "sent", None)
+                        .await;
                 }
             }
         }
@@ -197,16 +230,33 @@ async fn evolution_webhook(
                 if let Ok(Some(tenant)) = state.db.get_tenant_by_instance_name(instance).await {
                     let jid = data.get("id").and_then(|v| v.as_str()).unwrap_or("");
                     let presences = data.get("presences").and_then(|p| p.as_object());
-                    
+
                     if let Some(p_map) = presences {
                         for (p_jid, p_data) in p_map {
-                            let status = p_data.get("lastKnownPresence").and_then(|v| v.as_str()).unwrap_or("unavailable");
-                            let phone = p_jid.split('@').next().map(|s| format!("+{}", s)).unwrap_or_default();
-                            let _ = state.db.update_contact_presence(&tenant.id, &phone, status).await;
+                            let status = p_data
+                                .get("lastKnownPresence")
+                                .and_then(|v| v.as_str())
+                                .unwrap_or("unavailable");
+                            let phone = p_jid
+                                .split('@')
+                                .next()
+                                .map(|s| format!("+{}", s))
+                                .unwrap_or_default();
+                            let _ = state
+                                .db
+                                .update_contact_presence(&tenant.id, &phone, status)
+                                .await;
                         }
                     } else if !jid.is_empty() {
-                        let phone = jid.split('@').next().map(|s| format!("+{}", s)).unwrap_or_default();
-                        let _ = state.db.update_contact_presence(&tenant.id, &phone, "composing").await;
+                        let phone = jid
+                            .split('@')
+                            .next()
+                            .map(|s| format!("+{}", s))
+                            .unwrap_or_default();
+                        let _ = state
+                            .db
+                            .update_contact_presence(&tenant.id, &phone, "composing")
+                            .await;
                     }
                 }
             }
@@ -214,7 +264,10 @@ async fn evolution_webhook(
 
         "qrcode.updated" => {
             if let (Some(instance), Some(data)) = (&payload.instance, &payload.data) {
-                let qrcode = data.get("qrcode").and_then(|q| q.get("base64")).and_then(|v| v.as_str());
+                let qrcode = data
+                    .get("qrcode")
+                    .and_then(|q| q.get("base64"))
+                    .and_then(|v| v.as_str());
                 if let Some(base64) = qrcode {
                     let redis = state.redis.clone();
                     let key = format!("instance_qr:{}", instance);
@@ -226,7 +279,11 @@ async fn evolution_webhook(
 
         "chats.upsert" | "chats.update" => {
             if let Some(data) = &payload.data {
-                let count = if data.is_array() { data.as_array().map(|a| a.len()).unwrap_or(0) } else { 1 };
+                let count = if data.is_array() {
+                    data.as_array().map(|a| a.len()).unwrap_or(0)
+                } else {
+                    1
+                };
                 info!(instance = %payload.instance.as_deref().unwrap_or("unknown"), event = %payload.event, count, "WhatsApp chat list updated");
             }
         }

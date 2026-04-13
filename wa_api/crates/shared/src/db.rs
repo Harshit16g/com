@@ -84,7 +84,8 @@ pub struct ContactRow {
 
 impl DbClient {
     pub async fn new(database_url: &str) -> Result<Self> {
-        let pool = PgPool::connect(database_url).await
+        let pool = PgPool::connect(database_url)
+            .await
             .map_err(|e| anyhow!("Failed to connect to Postgres: {}", e))?;
         Ok(DbClient { pool })
     }
@@ -100,7 +101,7 @@ impl DbClient {
         debug!("DB agency lookup");
         let row = sqlx::query_as::<_, AgencyRow>(
             "SELECT id, name, api_key, subscription_status, plan_tier, daily_msg_limit \
-             FROM agencies WHERE api_key = $1 LIMIT 1"
+             FROM agencies WHERE api_key = $1 LIMIT 1",
         )
         .bind(key_hash)
         .fetch_optional(&self.pool)
@@ -108,11 +109,15 @@ impl DbClient {
         Ok(row)
     }
 
-    pub async fn get_tenant(&self, tenant_id: &Uuid, agency_id: &Uuid) -> Result<Option<TenantRow>> {
+    pub async fn get_tenant(
+        &self,
+        tenant_id: &Uuid,
+        agency_id: &Uuid,
+    ) -> Result<Option<TenantRow>> {
         let row = sqlx::query_as::<_, TenantRow>(
             "SELECT id, agency_id, partner_id, instance_name, wa_number, instance_status, \
              daily_crm_limit, campaign_enabled \
-             FROM tenants WHERE id = $1 AND agency_id = $2 LIMIT 1"
+             FROM tenants WHERE id = $1 AND agency_id = $2 LIMIT 1",
         )
         .bind(tenant_id)
         .bind(agency_id)
@@ -121,11 +126,14 @@ impl DbClient {
         Ok(row)
     }
 
-    pub async fn get_tenant_by_instance_name(&self, instance_name: &str) -> Result<Option<TenantRow>> {
+    pub async fn get_tenant_by_instance_name(
+        &self,
+        instance_name: &str,
+    ) -> Result<Option<TenantRow>> {
         let row = sqlx::query_as::<_, TenantRow>(
             "SELECT id, agency_id, partner_id, instance_name, wa_number, instance_status, \
              daily_crm_limit, campaign_enabled \
-             FROM tenants WHERE instance_name = $1 LIMIT 1"
+             FROM tenants WHERE instance_name = $1 LIMIT 1",
         )
         .bind(instance_name)
         .fetch_optional(&self.pool)
@@ -138,7 +146,7 @@ impl DbClient {
     pub async fn is_opted_out_platform(&self, phone_hash: &str) -> Result<bool> {
         let row: Option<(i64,)> = sqlx::query_as(
             "SELECT 1 FROM wa_customer_consent \
-             WHERE phone_hash = $1 AND tenant_id IS NULL AND opted_out = true LIMIT 1"
+             WHERE phone_hash = $1 AND tenant_id IS NULL AND opted_out = true LIMIT 1",
         )
         .bind(phone_hash)
         .fetch_optional(&self.pool)
@@ -149,7 +157,7 @@ impl DbClient {
     pub async fn is_opted_out_tenant(&self, phone_hash: &str, tenant_id: &Uuid) -> Result<bool> {
         let row: Option<(i64,)> = sqlx::query_as(
             "SELECT 1 FROM wa_customer_consent \
-             WHERE phone_hash = $1 AND tenant_id = $2 AND opted_out = true LIMIT 1"
+             WHERE phone_hash = $1 AND tenant_id = $2 AND opted_out = true LIMIT 1",
         )
         .bind(phone_hash)
         .bind(tenant_id)
@@ -169,7 +177,7 @@ impl DbClient {
              (phone_hash, tenant_id, opted_out, opted_out_source, opted_out_at) \
              VALUES ($1, $2, true, $3, NOW()) \
              ON CONFLICT (phone_hash, tenant_id) DO UPDATE \
-             SET opted_out = true, opted_out_source = $3, opted_out_at = NOW(), updated_at = NOW()"
+             SET opted_out = true, opted_out_source = $3, opted_out_at = NOW(), updated_at = NOW()",
         )
         .bind(phone_hash)
         .bind(tenant_id)
@@ -187,7 +195,7 @@ impl DbClient {
              (tenant_id, campaign_id, message_type, recipient_phone_hash, recipient_phone, \
               recipient_name, instance_used, status, evolution_msg_id, error_reason, \
               retry_count, scheduled_at, sent_at, idempotency_key) \
-             VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)"
+             VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)",
         )
         .bind(log.tenant_id)
         .bind(log.campaign_id)
@@ -216,7 +224,7 @@ impl DbClient {
     ) -> Result<()> {
         sqlx::query(
             "UPDATE wa_interaction_log SET status = $1, delivered_at = $2 \
-             WHERE evolution_msg_id = $3"
+             WHERE evolution_msg_id = $3",
         )
         .bind(status)
         .bind(delivered_at)
@@ -226,14 +234,10 @@ impl DbClient {
         Ok(())
     }
 
-    pub async fn update_interaction_name(
-        &self,
-        phone: &str,
-        name: &str,
-    ) -> Result<()> {
+    pub async fn update_interaction_name(&self, phone: &str, name: &str) -> Result<()> {
         sqlx::query(
             "UPDATE wa_interaction_log SET recipient_name = $1 \
-             WHERE recipient_phone = $2 AND recipient_name IS NULL"
+             WHERE recipient_phone = $2 AND recipient_name IS NULL",
         )
         .bind(name)
         .bind(phone)
@@ -244,10 +248,14 @@ impl DbClient {
 
     // ─── Campaign ─────────────────────────────────────────────────────────
 
-    pub async fn update_campaign_counts(&self, campaign_id: &Uuid, update: &CampaignStatusUpdate) -> Result<()> {
+    pub async fn update_campaign_counts(
+        &self,
+        campaign_id: &Uuid,
+        update: &CampaignStatusUpdate,
+    ) -> Result<()> {
         sqlx::query(
             "UPDATE wa_campaigns SET status=$1, sent_count=$2, delivered_count=$3, \
-             failed_count=$4, deferred_count=$5, updated_at=NOW() WHERE id=$6"
+             failed_count=$4, deferred_count=$5, updated_at=NOW() WHERE id=$6",
         )
         .bind(&update.status)
         .bind(update.sent_count)
@@ -261,7 +269,7 @@ impl DbClient {
     }
 
     // ─── Instance health log ──────────────────────────────────────────────
-
+    #[allow(clippy::too_many_arguments)]
     pub async fn log_instance_health_event(
         &self,
         instance_name: &str,
@@ -304,7 +312,7 @@ impl DbClient {
              ON CONFLICT (tenant_id, phone) DO UPDATE \
              SET name = COALESCE($3, wa_contacts.name), \
                  profile_pic_url = COALESCE($4, wa_contacts.profile_pic_url), \
-                 updated_at = NOW()"
+                 updated_at = NOW()",
         )
         .bind(tenant_id)
         .bind(phone)
@@ -324,7 +332,7 @@ impl DbClient {
         sqlx::query(
             "UPDATE wa_contacts \
              SET last_presence = $1, last_seen_at = NOW(), updated_at = NOW() \
-             WHERE tenant_id = $2 AND phone = $3"
+             WHERE tenant_id = $2 AND phone = $3",
         )
         .bind(presence)
         .bind(tenant_id)

@@ -5,12 +5,7 @@ use tracing::debug;
 
 /// Enforce inter-message delay for an Evolution API instance.
 /// Randomizes between min and max to avoid detection patterns.
-pub async fn enforce_delay(
-    redis: &RedisClient,
-    instance_name: &str,
-    min_secs: u64,
-    max_secs: u64,
-) {
+pub async fn enforce_delay(redis: &RedisClient, instance_name: &str, min_secs: u64, max_secs: u64) {
     let last_sent = redis
         .get_last_sent(instance_name)
         .await

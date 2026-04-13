@@ -6,10 +6,7 @@ use tracing::{error, info, warn};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
 
 use shared::{
-    config::AppConfig,
-    db::DbClient,
-    evolution::EvolutionClient,
-    redis_client::RedisClient,
+    config::AppConfig, db::DbClient, evolution::EvolutionClient, redis_client::RedisClient,
     types::InstanceHealth,
 };
 
@@ -79,7 +76,10 @@ async fn check_all_instances(
             _ => InstanceHealth::Disconnected,
         };
 
-        let prev_health = redis.get_instance_health(name).await.unwrap_or(InstanceHealth::Disconnected);
+        let prev_health = redis
+            .get_instance_health(name)
+            .await
+            .unwrap_or(InstanceHealth::Disconnected);
 
         if prev_health != new_health {
             info!(

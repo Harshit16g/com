@@ -28,7 +28,10 @@ impl RedisClient {
 
     pub async fn set_ex<T: Serialize>(&self, key: &str, value: &T, ttl_secs: u64) -> Result<()> {
         let v = serde_json::to_string(value)?;
-        let _: () = self.pool.set(key, v, Some(Expiration::EX(ttl_secs as i64)), None, false).await?;
+        let _: () = self
+            .pool
+            .set(key, v, Some(Expiration::EX(ttl_secs as i64)), None, false)
+            .await?;
         Ok(())
     }
 
@@ -50,7 +53,16 @@ impl RedisClient {
     }
 
     pub async fn set_string_ex(&self, key: &str, value: &str, ttl_secs: u64) -> Result<()> {
-        let _: () = self.pool.set(key, value, Some(Expiration::EX(ttl_secs as i64)), None, false).await?;
+        let _: () = self
+            .pool
+            .set(
+                key,
+                value,
+                Some(Expiration::EX(ttl_secs as i64)),
+                None,
+                false,
+            )
+            .await?;
         Ok(())
     }
 
@@ -78,8 +90,15 @@ impl RedisClient {
 
     /// SET NX EX — returns true if key was newly set.
     pub async fn set_nx_ex(&self, key: &str, value: &str, ttl_secs: u64) -> Result<bool> {
-        let result: Option<String> = self.pool
-            .set(key, value, Some(Expiration::EX(ttl_secs as i64)), Some(SetOptions::NX), false)
+        let result: Option<String> = self
+            .pool
+            .set(
+                key,
+                value,
+                Some(Expiration::EX(ttl_secs as i64)),
+                Some(SetOptions::NX),
+                false,
+            )
             .await?;
         Ok(result.is_some())
     }
@@ -89,13 +108,17 @@ impl RedisClient {
     pub async fn zadd_scheduled(&self, tenant_id: &str, score: f64, job_id: &str) -> Result<()> {
         let key = format!("jobs:scheduled:{}", tenant_id);
         let values = MultipleZaddValues::try_from((score, job_id.to_string()))?;
-        let _: () = self.pool.zadd(&key, None, None, false, false, values).await?;
+        let _: () = self
+            .pool
+            .zadd(&key, None, None, false, false, values)
+            .await?;
         Ok(())
     }
 
     pub async fn zrangebyscore_ready(&self, tenant_id: &str, now: f64) -> Result<Vec<String>> {
         let key = format!("jobs:scheduled:{}", tenant_id);
-        let result: Vec<String> = self.pool
+        let result: Vec<String> = self
+            .pool
             .zrangebyscore(&key, 0.0_f64, now, false, None)
             .await?;
         Ok(result)
@@ -148,7 +171,10 @@ impl RedisClient {
     pub async fn save_job(&self, job: &WhatsAppJob) -> Result<()> {
         let key = format!("job:{}", job.job_id);
         let json = serde_json::to_string(job)?;
-        let _: () = self.pool.set(&key, json, Some(Expiration::EX(48 * 3600)), None, false).await?;
+        let _: () = self
+            .pool
+            .set(&key, json, Some(Expiration::EX(48 * 3600)), None, false)
+            .await?;
         Ok(())
     }
 
@@ -166,12 +192,21 @@ impl RedisClient {
     pub async fn get_instance_health(&self, instance_name: &str) -> Result<InstanceHealth> {
         let key = format!("instance_health:{}", instance_name);
         let raw: Option<String> = self.pool.get(&key).await?;
-        Ok(raw.and_then(|s| s.parse().ok()).unwrap_or(InstanceHealth::Disconnected))
+        Ok(raw
+            .and_then(|s| s.parse().ok())
+            .unwrap_or(InstanceHealth::Disconnected))
     }
 
-    pub async fn set_instance_health(&self, instance_name: &str, health: &InstanceHealth) -> Result<()> {
+    pub async fn set_instance_health(
+        &self,
+        instance_name: &str,
+        health: &InstanceHealth,
+    ) -> Result<()> {
         let key = format!("instance_health:{}", instance_name);
-        let _: () = self.pool.set(&key, health.as_str(), None, None, false).await?;
+        let _: () = self
+            .pool
+            .set(&key, health.as_str(), None, None, false)
+            .await?;
         Ok(())
     }
 
@@ -185,7 +220,16 @@ impl RedisClient {
 
     pub async fn set_last_sent(&self, instance_name: &str, timestamp: i64) -> Result<()> {
         let key = format!("rate_limit:{}:last_sent", instance_name);
-        let _: () = self.pool.set(&key, timestamp.to_string(), Some(Expiration::EX(60)), None, false).await?;
+        let _: () = self
+            .pool
+            .set(
+                &key,
+                timestamp.to_string(),
+                Some(Expiration::EX(60)),
+                None,
+                false,
+            )
+            .await?;
         Ok(())
     }
 
@@ -224,7 +268,11 @@ impl RedisClient {
         Ok(raw.and_then(|s| s.parse().ok()).unwrap_or(0))
     }
 
-    pub async fn spam_guard_add_partner_today(&self, phone_hash: &str, partner_hash: &str) -> Result<()> {
+    pub async fn spam_guard_add_partner_today(
+        &self,
+        phone_hash: &str,
+        partner_hash: &str,
+    ) -> Result<()> {
         let key = format!("spam_guard:{}:partners_today", phone_hash);
         let _: () = self.pool.sadd(&key, partner_hash).await?;
         let _: () = self.pool.expire(&key, 24 * 3600_i64).await?;
@@ -239,7 +287,8 @@ impl RedisClient {
     // ─── Idempotency ──────────────────────────────────────────────────────
 
     pub async fn mark_sent(&self, idempotency_key: &str) -> Result<bool> {
-        self.set_nx_ex(&format!("idem:{}", idempotency_key), "1", 48 * 3600).await
+        self.set_nx_ex(&format!("idem:{}", idempotency_key), "1", 48 * 3600)
+            .await
     }
 
     pub async fn is_already_sent(&self, idempotency_key: &str) -> Result<bool> {
@@ -266,7 +315,10 @@ impl RedisClient {
 
     pub async fn campaigns_add_active(&self, campaign_id: &str, score: f64) -> Result<()> {
         let values = MultipleZaddValues::try_from((score, campaign_id.to_string()))?;
-        let _: () = self.pool.zadd("campaigns:active", None, None, false, false, values).await?;
+        let _: () = self
+            .pool
+            .zadd("campaigns:active", None, None, false, false, values)
+            .await?;
         Ok(())
     }
 
@@ -279,7 +331,10 @@ impl RedisClient {
 
     pub async fn scan_scheduled_tenants(&self) -> Result<Vec<String>> {
         let mut tenants = Vec::new();
-        let mut stream = self.pool.next().scan_buffered("jobs:scheduled:*", Some(100), None);
+        let mut stream = self
+            .pool
+            .next()
+            .scan_buffered("jobs:scheduled:*", Some(100), None);
         while let Some(res) = stream.next().await {
             let key: fred::types::RedisKey = res?;
             if let Some(k_str) = key.as_str() {
@@ -293,7 +348,10 @@ impl RedisClient {
 
     pub async fn scan_ready_tenants(&self) -> Result<Vec<String>> {
         let mut tenants = Vec::new();
-        let mut stream = self.pool.next().scan_buffered("jobs:ready:*", Some(100), None);
+        let mut stream = self
+            .pool
+            .next()
+            .scan_buffered("jobs:ready:*", Some(100), None);
         while let Some(res) = stream.next().await {
             let key: fred::types::RedisKey = res?;
             if let Some(k_str) = key.as_str() {
@@ -310,11 +368,17 @@ impl RedisClient {
     pub async fn cache_api_key<T: Serialize>(&self, api_key_hash: &str, ctx: &T) -> Result<()> {
         let key = format!("apikey:{}", api_key_hash);
         let json = serde_json::to_string(ctx)?;
-        let _: () = self.pool.set(&key, json, Some(Expiration::EX(300)), None, false).await?;
+        let _: () = self
+            .pool
+            .set(&key, json, Some(Expiration::EX(300)), None, false)
+            .await?;
         Ok(())
     }
 
-    pub async fn get_cached_api_key<T: DeserializeOwned>(&self, api_key_hash: &str) -> Result<Option<T>> {
+    pub async fn get_cached_api_key<T: DeserializeOwned>(
+        &self,
+        api_key_hash: &str,
+    ) -> Result<Option<T>> {
         let key = format!("apikey:{}", api_key_hash);
         let raw: Option<String> = self.pool.get(&key).await?;
         match raw {
