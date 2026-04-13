@@ -114,8 +114,8 @@ jobs:
         
       - name: Deploy Services
         run: |
-          railway up --detach --service api-core
-          railway up --detach --service worker-core
-          railway up --detach --service evo_api
+          railway redeploy --service api-core --yes
+          railway redeploy --service worker-core --yes
+          railway redeploy --service evo_api --yes
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
