@@ -10,7 +10,6 @@ mod auth;
 mod routes;
 mod services;
 
-
 use shared::state::AppState;
 
 pub async fn start_server(state: Arc<AppState>) -> Result<()> {
@@ -40,10 +39,7 @@ pub async fn start_server(state: Arc<AppState>) -> Result<()> {
     let webhook_routes = routes::webhook::router();
 
     // Health route
-    let health_route = Router::new().route(
-        "/health",
-        axum::routing::get(|| async { "OK" }),
-    );
+    let health_route = Router::new().route("/health", axum::routing::get(|| async { "OK" }));
 
     let app = Router::new()
         .merge(health_route)
@@ -56,10 +52,10 @@ pub async fn start_server(state: Arc<AppState>) -> Result<()> {
 
     let addr = format!("0.0.0.0:{}", port);
     info!("Starting API server...");
-    
+
     let listener = tokio::net::TcpListener::bind(&addr).await?;
     info!("Listening on {}", addr);
-    
+
     axum::serve(listener, app)
         .with_graceful_shutdown(shutdown_signal())
         .await?;

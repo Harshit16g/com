@@ -3,9 +3,8 @@ use std::time::Duration;
 use tokio::time::sleep;
 use tracing::{error, info};
 
-
-use shared::{redis_client::RedisClient, utils::now_unix};
 use shared::state::AppState;
+use shared::{redis_client::RedisClient, utils::now_unix};
 use std::sync::Arc;
 
 pub async fn start(state: Arc<AppState>) -> Result<()> {

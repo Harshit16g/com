@@ -81,7 +81,11 @@ async fn start_campaign(
     }
 
     // ── Backpressure check ─────────────────────────────────────────────
-    if let Ok(len) = state.redis.queue_len_ready(&ctx.tenant_id.to_string()).await {
+    if let Ok(len) = state
+        .redis
+        .queue_len_ready(&ctx.tenant_id.to_string())
+        .await
+    {
         if len > 5000 {
             tracing::warn!(tenant_id = %ctx.tenant_id, queue_len = len, "Backpressure triggered in campaign sender");
             return (

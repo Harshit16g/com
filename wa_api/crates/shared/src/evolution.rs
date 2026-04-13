@@ -181,12 +181,13 @@ impl EvolutionClient {
                     }
 
                     // Parse message ID from response
-                    let send_resp: SendResponse = serde_json::from_str(&body_text).map_err(|e| {
-                        EvolutionError::Transient(format!(
-                            "Failed to parse response: {} body={}",
-                            e, body_text
-                        ))
-                    })?;
+                    let send_resp: SendResponse =
+                        serde_json::from_str(&body_text).map_err(|e| {
+                            EvolutionError::Transient(format!(
+                                "Failed to parse response: {} body={}",
+                                e, body_text
+                            ))
+                        })?;
 
                     let msg_id = send_resp
                         .key

@@ -2,7 +2,6 @@ use anyhow::Result;
 use std::sync::Arc;
 use tracing::info;
 
-
 mod processor;
 mod rate_limiter;
 
@@ -16,8 +15,6 @@ pub async fn start(state: Arc<AppState>) -> Result<()> {
         .unwrap_or(4);
 
     info!("Starting {} worker tasks", worker_count);
-
-
 
     let mut handles = Vec::new();
 

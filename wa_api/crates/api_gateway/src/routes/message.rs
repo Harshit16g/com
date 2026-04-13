@@ -89,7 +89,11 @@ async fn send_message(
     };
 
     // ── 1.5 Backpressure check ─────────────────────────────────────────────
-    if let Ok(len) = state.redis.queue_len_ready(&ctx.tenant_id.to_string()).await {
+    if let Ok(len) = state
+        .redis
+        .queue_len_ready(&ctx.tenant_id.to_string())
+        .await
+    {
         // Soft limit of 5000 active queued jobs per tenant
         if len > 5000 {
             tracing::warn!(tenant_id = %ctx.tenant_id, queue_len = len, "Backpressure triggered in message sender");

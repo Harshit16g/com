@@ -4,7 +4,6 @@ use std::time::Duration;
 use tokio::time::sleep;
 use tracing::{error, info, warn};
 
-
 use shared::{
     evolution::EvolutionClient,
     redis_client::RedisClient,
