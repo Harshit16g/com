@@ -108,7 +108,7 @@ async fn admin_interactions(
 }
 
 /// POST /admin/instance/create
-/// Admin-only: provisions a new Evolution API instance and creates the
+/// Admin-only: provisions a new evo API instance and creates the
 /// corresponding tenant record in the wa_api database.
 /// One instance per partner — enforced by the unique constraint on instance_name.
 #[derive(Debug, Deserialize)]
@@ -148,10 +148,10 @@ async fn admin_create_instance(
             .into_response();
     }
 
-    // 2. Create instance in Evolution API
-    match state.evolution.create_instance(&req.instance_name).await {
+    // 2. Create instance in evo API
+    match state.evo.create_instance(&req.instance_name).await {
         Ok(evo_resp) => {
-            info!(instance_name = %req.instance_name, "Instance created in Evolution API");
+            info!(instance_name = %req.instance_name, "Instance created in evo API");
 
             // 3. Insert tenant record in wa_api DB
             let tenant_id = Uuid::new_v4();
@@ -178,14 +178,14 @@ async fn admin_create_instance(
                         "status": "qr_required",
                         "daily_crm_limit": req.daily_crm_limit.unwrap_or(200),
                         "campaign_enabled": req.campaign_enabled.unwrap_or(false),
-                        "evolution_response": evo_resp,
+                        "evo_response": evo_resp,
                         "next_step": "Partner should scan QR via /instance/qr",
                     })),
                 )
                     .into_response(),
                 Err(e) => {
-                    // Rollback: delete from Evolution API (best-effort)
-                    tracing::error!("DB insert failed after Evolution create: {}", e);
+                    // Rollback: delete from evo API (best-effort)
+                    tracing::error!("DB insert failed after evo create: {}", e);
                     (
                         StatusCode::INTERNAL_SERVER_ERROR,
                         Json(json!({ "error": format!("DB insert failed: {}", e) })),
@@ -195,10 +195,10 @@ async fn admin_create_instance(
             }
         }
         Err(e) => {
-            tracing::error!("Evolution create_instance failed: {}", e);
+            tracing::error!("evo create_instance failed: {}", e);
             (
                 StatusCode::BAD_GATEWAY,
-                Json(json!({ "error": format!("Evolution API error: {}", e) })),
+                Json(json!({ "error": format!("evo API error: {}", e) })),
             )
                 .into_response()
         }

@@ -1,5 +1,5 @@
-FROM evoapicloud/evolution-api:latest AS base
-WORKDIR /evolution
+FROM evoapicloud/evo-api:latest AS base
+WORKDIR /evo
 
 # Copiamos apenas o necessário para recompilar o dist com as mudanças locais
 COPY tsconfig.json tsup.config.ts package.json ./
@@ -9,11 +9,11 @@ COPY src ./src
 RUN npm run build
 
 # Runtime final: reaproveita a imagem oficial e apenas sobrepõe o dist
-FROM evoapicloud/evolution-api:latest AS final
-WORKDIR /evolution
-COPY --from=base /evolution/dist ./dist
+FROM evoapicloud/evo-api:latest AS final
+WORKDIR /evo
+COPY --from=base /evo/dist ./dist
 
 ENV PROMETHEUS_METRICS=true
 
-# Entrada original da imagem oficial já sobe o app em /evolution
+# Entrada original da imagem oficial já sobe o app em /evo
 

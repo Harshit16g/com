@@ -14,14 +14,14 @@ body:
       description: |
         The issue tracker is only for reporting bugs and feature requests.
         For user-related support questions, please visit:
-          - [Discord](https://evolution-api.com/discord)
-          - [WhatsApp Group](https://evolution-api.com/whatsapp)
+          - [Discord](https://evo-api.com/discord)
+          - [WhatsApp Group](https://evo-api.com/whatsapp)
           <br/>
 
         **DO NOT OPEN AN ISSUE FOR GENERAL SUPPORT QUESTIONS.**
 
       options:
-        - label: Yes, I have searched for similar issues on [GitHub](https://github.com/EvolutionAPI/evolution-api/issues) and found none.
+        - label: Yes, I have searched for similar issues on [GitHub](https://github.com/evoAPI/evo-api/issues) and found none.
           required: true
 
   - type: textarea

@@ -3,7 +3,7 @@ import { PrismaRepository } from '@api/repository/repository.service';
 import {
   difyController,
   evoaiController,
-  evolutionBotController,
+  evoBotController,
   flowiseController,
   n8nController,
   openaiController,
@@ -91,7 +91,7 @@ export class ChatbotController {
       pushName,
       isIntegration,
     };
-    evolutionBotController.emit(emitData);
+    evoBotController.emit(emitData);
 
     typebotController.emit(emitData);
 

@@ -102,8 +102,8 @@ model Instance {
   Dify                    Dify[]
   DifySetting             DifySetting?
   IntegrationSession      IntegrationSession[]
-  EvolutionBot            EvolutionBot[]
-  EvolutionBotSetting     EvolutionBotSetting?
+  evoBot            evoBot[]
+  evoBotSetting     evoBotSetting?
   Flowise                 Flowise[]
   FlowiseSetting          FlowiseSetting?
   N8n                     N8n[]
@@ -555,7 +555,7 @@ model DifySetting {
   instanceId      String    @unique
 }
 
-model EvolutionBot {
+model evoBot {
   id                  String                @id @default(cuid())
   enabled             Boolean               @default(true)
   description         String?               @db.VarChar(255)
@@ -579,10 +579,10 @@ model EvolutionBot {
   updatedAt           DateTime              @updatedAt @db.Timestamp
   Instance            Instance              @relation(fields: [instanceId], references: [id], onDelete: Cascade)
   instanceId          String
-  EvolutionBotSetting EvolutionBotSetting[]
+  evoBotSetting evoBotSetting[]
 }
 
-model EvolutionBotSetting {
+model evoBotSetting {
   id              String        @id @default(cuid())
   expire          Int?          @default(0) @db.Int
   keywordFinish   String?       @db.VarChar(100)
@@ -597,7 +597,7 @@ model EvolutionBotSetting {
   timePerChar     Int?          @default(50) @db.Int
   createdAt       DateTime?     @default(dbgenerated("CURRENT_TIMESTAMP")) @db.Timestamp
   updatedAt       DateTime      @updatedAt @db.Timestamp
-  Fallback        EvolutionBot? @relation(fields: [botIdFallback], references: [id])
+  Fallback        evoBot? @relation(fields: [botIdFallback], references: [id])
   botIdFallback   String?       @db.VarChar(100)
   Instance        Instance      @relation(fields: [instanceId], references: [id], onDelete: Cascade)
   instanceId      String        @unique

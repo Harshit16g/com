@@ -5,7 +5,7 @@ services:
     container_name: mysql
     image: percona/percona-server:8.0
     networks:
-      - evolution-net
+      - evo-net
     restart: always
     ports:
       - 3306:3306
@@ -22,6 +22,6 @@ volumes:
 
 
 networks:
-  evolution-net:
-    name: evolution-net
+  evo-net:
+    name: evo-net
     driver: bridge

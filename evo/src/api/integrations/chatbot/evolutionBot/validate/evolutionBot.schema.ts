@@ -20,7 +20,7 @@ const isNotEmpty = (...propertyNames: string[]): JSONSchema7 => {
   };
 };
 
-export const evolutionBotSchema: JSONSchema7 = {
+export const evoBotSchema: JSONSchema7 = {
   $id: v4(),
   type: 'object',
   properties: {
@@ -47,7 +47,7 @@ export const evolutionBotSchema: JSONSchema7 = {
   ...isNotEmpty('enabled', 'apiUrl', 'triggerType'),
 };
 
-export const evolutionBotStatusSchema: JSONSchema7 = {
+export const evoBotStatusSchema: JSONSchema7 = {
   $id: v4(),
   type: 'object',
   properties: {
@@ -58,7 +58,7 @@ export const evolutionBotStatusSchema: JSONSchema7 = {
   ...isNotEmpty('remoteJid', 'status'),
 };
 
-export const evolutionBotSettingSchema: JSONSchema7 = {
+export const evoBotSettingSchema: JSONSchema7 = {
   $id: v4(),
   type: 'object',
   properties: {
@@ -103,7 +103,7 @@ export const evolutionBotSettingSchema: JSONSchema7 = {
   ),
 };
 
-export const evolutionBotIgnoreJidSchema: JSONSchema7 = {
+export const evoBotIgnoreJidSchema: JSONSchema7 = {
   $id: v4(),
   type: 'object',
   properties: {

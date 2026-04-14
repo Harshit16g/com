@@ -1,3 +1,3 @@
-[submodule "evolution-manager-v2"]
-	path = evolution-manager-v2
-	url = https://github.com/EvolutionAPI/evolution-manager-v2.git
+[submodule "evo-manager-v2"]
+	path = evo-manager-v2
+	url = https://github.com/evoAPI/evo-manager-v2.git

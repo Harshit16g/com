@@ -1,4 +1,4 @@
-# Prometheus configuration example for Evolution API
+# Prometheus configuration example for evo API
 # Copy this file to prometheus.yml and adjust the settings
 
 global:
@@ -10,10 +10,10 @@ rule_files:
   # - "second_rules.yml"
 
 scrape_configs:
-  # Evolution API metrics
-  - job_name: 'evolution-api'
+  # evo API metrics
+  - job_name: 'evo-api'
     static_configs:
-      - targets: ['localhost:8080']  # Adjust to your Evolution API URL
+      - targets: ['localhost:8080']  # Adjust to your evo API URL
     
     # Metrics endpoint path
     metrics_path: '/metrics'
@@ -33,7 +33,7 @@ scrape_configs:
       - source_labels: [__param_target]
         target_label: instance
       - target_label: __address__
-        replacement: localhost:8080  # Evolution API address
+        replacement: localhost:8080  # evo API address
 
 # Alerting configuration (optional)
 alerting:
@@ -42,35 +42,35 @@ alerting:
         - targets:
           # - alertmanager:9093
 
-# Example alert rules for Evolution API
-# Create a file called evolution_alerts.yml with these rules:
+# Example alert rules for evo API
+# Create a file called evo_alerts.yml with these rules:
 #
 # groups:
-#   - name: evolution-api
+#   - name: evo-api
 #     rules:
-#       - alert: EvolutionAPIDown
-#         expr: up{job="evolution-api"} == 0
+#       - alert: evoAPIDown
+#         expr: up{job="evo-api"} == 0
 #         for: 1m
 #         labels:
 #           severity: critical
 #         annotations:
-#           summary: "Evolution API is down"
-#           description: "Evolution API has been down for more than 1 minute."
+#           summary: "evo API is down"
+#           description: "evo API has been down for more than 1 minute."
 #       
-#       - alert: EvolutionInstanceDown
-#         expr: evolution_instance_up == 0
+#       - alert: evoInstanceDown
+#         expr: evo_instance_up == 0
 #         for: 2m
 #         labels:
 #           severity: warning
 #         annotations:
-#           summary: "Evolution instance {{ $labels.instance }} is down"
+#           summary: "evo instance {{ $labels.instance }} is down"
 #           description: "Instance {{ $labels.instance }} has been down for more than 2 minutes."
 #       
 #       - alert: HighInstanceCount
-#         expr: evolution_instances_total > 100
+#         expr: evo_instances_total > 100
 #         for: 5m
 #         labels:
 #           severity: warning
 #         annotations:
-#           summary: "High number of Evolution instances"
-#           description: "Evolution API is managing {{ $value }} instances."
+#           summary: "High number of evo instances"
+#           description: "evo API is managing {{ $value }} instances."

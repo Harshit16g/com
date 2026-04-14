@@ -5,7 +5,7 @@ use tokio::time::sleep;
 use tracing::{error, info, warn};
 
 use shared::{
-    evolution::EvolutionClient,
+    evo::evoClient,
     redis_client::RedisClient,
     types::{InstanceHealth, PoolNumberState},
 };
@@ -32,12 +32,12 @@ use std::sync::Arc;
 
 pub async fn start(state: Arc<AppState>) -> Result<()> {
     let redis = &state.redis;
-    let evolution = &state.evolution;
+    let evo = &state.evo;
 
     info!("Pool manager started — health check every 15 minutes");
 
     loop {
-        if let Err(e) = health_check_all(redis, evolution).await {
+        if let Err(e) = health_check_all(redis, evo).await {
             error!("Pool health check error: {}", e);
         }
 
@@ -57,13 +57,13 @@ pub async fn start(state: Arc<AppState>) -> Result<()> {
 }
 
 /// Ping each pool instance and update health state.
-async fn health_check_all(redis: &RedisClient, evolution: &EvolutionClient) -> Result<()> {
+async fn health_check_all(redis: &RedisClient, evo: &evoClient) -> Result<()> {
     let instances = get_all_pool_instances(redis).await?;
 
     for mut instance in instances {
         let _prev_state = instance.state.clone();
 
-        match evolution.get_instance_status(&instance.name).await {
+        match evo.get_instance_status(&instance.name).await {
             Ok(state) => {
                 let health = match state.as_str() {
                     "OPEN" | "CONNECTED" => InstanceHealth::Active,

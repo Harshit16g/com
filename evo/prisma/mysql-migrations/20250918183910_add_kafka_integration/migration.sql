@@ -15,10 +15,10 @@
   - You are about to alter the column `updatedAt` on the `Evoai` table. The data in that column could be lost. The data in that column will be cast from `Timestamp(0)` to `Timestamp`.
   - You are about to alter the column `createdAt` on the `EvoaiSetting` table. The data in that column could be lost. The data in that column will be cast from `Timestamp(0)` to `Timestamp`.
   - You are about to alter the column `updatedAt` on the `EvoaiSetting` table. The data in that column could be lost. The data in that column will be cast from `Timestamp(0)` to `Timestamp`.
-  - You are about to alter the column `createdAt` on the `EvolutionBot` table. The data in that column could be lost. The data in that column will be cast from `Timestamp(0)` to `Timestamp`.
-  - You are about to alter the column `updatedAt` on the `EvolutionBot` table. The data in that column could be lost. The data in that column will be cast from `Timestamp(0)` to `Timestamp`.
-  - You are about to alter the column `createdAt` on the `EvolutionBotSetting` table. The data in that column could be lost. The data in that column will be cast from `Timestamp(0)` to `Timestamp`.
-  - You are about to alter the column `updatedAt` on the `EvolutionBotSetting` table. The data in that column could be lost. The data in that column will be cast from `Timestamp(0)` to `Timestamp`.
+  - You are about to alter the column `createdAt` on the `evoBot` table. The data in that column could be lost. The data in that column will be cast from `Timestamp(0)` to `Timestamp`.
+  - You are about to alter the column `updatedAt` on the `evoBot` table. The data in that column could be lost. The data in that column will be cast from `Timestamp(0)` to `Timestamp`.
+  - You are about to alter the column `createdAt` on the `evoBotSetting` table. The data in that column could be lost. The data in that column will be cast from `Timestamp(0)` to `Timestamp`.
+  - You are about to alter the column `updatedAt` on the `evoBotSetting` table. The data in that column could be lost. The data in that column will be cast from `Timestamp(0)` to `Timestamp`.
   - You are about to alter the column `createdAt` on the `Flowise` table. The data in that column could be lost. The data in that column will be cast from `Timestamp(0)` to `Timestamp`.
   - You are about to alter the column `updatedAt` on the `Flowise` table. The data in that column could be lost. The data in that column will be cast from `Timestamp(0)` to `Timestamp`.
   - You are about to alter the column `createdAt` on the `FlowiseSetting` table. The data in that column could be lost. The data in that column will be cast from `Timestamp(0)` to `Timestamp`.
@@ -106,11 +106,11 @@ ALTER TABLE `EvoaiSetting` MODIFY `createdAt` TIMESTAMP NULL DEFAULT CURRENT_TIM
     MODIFY `updatedAt` TIMESTAMP NOT NULL;
 
 -- AlterTable
-ALTER TABLE `EvolutionBot` MODIFY `createdAt` TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+ALTER TABLE `evoBot` MODIFY `createdAt` TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
     MODIFY `updatedAt` TIMESTAMP NOT NULL;
 
 -- AlterTable
-ALTER TABLE `EvolutionBotSetting` MODIFY `createdAt` TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+ALTER TABLE `evoBotSetting` MODIFY `createdAt` TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
     MODIFY `updatedAt` TIMESTAMP NOT NULL;
 
 -- AlterTable

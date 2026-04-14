@@ -7,19 +7,19 @@ use tracing::info;
 
 use shared::state::AppState;
 
-/// Evolution API webhook payload (simplified).
+/// evo API webhook payload (simplified).
 #[derive(Debug, Deserialize)]
-pub struct EvolutionWebhook {
+pub struct evoWebhook {
     pub event: String,
     pub instance: Option<String>,
     pub data: Option<serde_json::Value>,
 }
 
-/// POST /webhook/evolution
-/// Receives delivery receipts, incoming messages, and presence updates from Evolution API.
-async fn evolution_webhook(
+/// POST /webhook/evo
+/// Receives delivery receipts, incoming messages, and presence updates from evo API.
+async fn evo_webhook(
     State(state): State<Arc<AppState>>,
-    Json(payload): Json<EvolutionWebhook>,
+    Json(payload): Json<evoWebhook>,
 ) -> impl IntoResponse {
     match payload.event.as_str() {
         // Delivery receipt
@@ -118,7 +118,7 @@ async fn evolution_webhook(
                             recipient_name: push_name.map(|s| s.to_string()),
                             instance_used: instance.clone(),
                             status: "delivered".to_string(),
-                            evolution_msg_id: Some(msg_id.to_string()),
+                            evo_msg_id: Some(msg_id.to_string()),
                             error_reason: None,
                             retry_count: 0,
                             scheduled_at: chrono::Utc::now(),
@@ -294,7 +294,7 @@ async fn evolution_webhook(
                 info!(
                     instance = %payload.instance.as_deref().unwrap_or("unknown"),
                     event = %event,
-                    "Evolution webhook event received"
+                    "evo webhook event received"
                 );
             }
         }
@@ -304,5 +304,5 @@ async fn evolution_webhook(
 }
 
 pub fn router() -> Router<Arc<AppState>> {
-    Router::new().route("/webhook/evolution", post(evolution_webhook))
+    Router::new().route("/webhook/evo", post(evo_webhook))
 }

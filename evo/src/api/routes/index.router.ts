@@ -74,7 +74,7 @@ const metricsBasicAuth = (req: Request, res: Response, next: NextFunction) => {
 
   const auth = req.get('Authorization');
   if (!auth || !auth.startsWith('Basic ')) {
-    res.set('WWW-Authenticate', 'Basic realm="Evolution API Metrics"');
+    res.set('WWW-Authenticate', 'Basic realm="evo API Metrics"');
     return res.status(401).send('Authentication required');
   }
 
@@ -119,10 +119,10 @@ if (metricsConfig.ENABLED) {
     const serverUrl = serverConfig.URL || '';
 
     // environment info
-    lines.push('# HELP evolution_environment_info Environment information');
-    lines.push('# TYPE evolution_environment_info gauge');
+    lines.push('# HELP evo_environment_info Environment information');
+    lines.push('# TYPE evo_environment_info gauge');
     lines.push(
-      `evolution_environment_info{version="${escapeLabel(packageJson.version)}",clientName="${escapeLabel(
+      `evo_environment_info{version="${escapeLabel(packageJson.version)}",clientName="${escapeLabel(
         clientName,
       )}",serverUrl="${escapeLabel(serverUrl)}"} 1`,
     );
@@ -131,15 +131,15 @@ if (metricsConfig.ENABLED) {
     const instanceEntries = Object.entries(instances);
 
     // total instances
-    lines.push('# HELP evolution_instances_total Total number of instances');
-    lines.push('# TYPE evolution_instances_total gauge');
-    lines.push(`evolution_instances_total ${instanceEntries.length}`);
+    lines.push('# HELP evo_instances_total Total number of instances');
+    lines.push('# TYPE evo_instances_total gauge');
+    lines.push(`evo_instances_total ${instanceEntries.length}`);
 
     // per-instance status
-    lines.push('# HELP evolution_instance_up 1 if instance state is open, else 0');
-    lines.push('# TYPE evolution_instance_up gauge');
-    lines.push('# HELP evolution_instance_state Instance state as a labelled metric');
-    lines.push('# TYPE evolution_instance_state gauge');
+    lines.push('# HELP evo_instance_up 1 if instance state is open, else 0');
+    lines.push('# TYPE evo_instance_up gauge');
+    lines.push('# HELP evo_instance_state Instance state as a labelled metric');
+    lines.push('# TYPE evo_instance_state gauge');
 
     for (const [name, instance] of instanceEntries) {
       const state = instance?.connectionStatus?.state || 'unknown';
@@ -147,10 +147,10 @@ if (metricsConfig.ENABLED) {
       const up = state === 'open' ? 1 : 0;
 
       lines.push(
-        `evolution_instance_up{instance="${escapeLabel(name)}",integration="${escapeLabel(integration)}"} ${up}`,
+        `evo_instance_up{instance="${escapeLabel(name)}",integration="${escapeLabel(integration)}"} ${up}`,
       );
       lines.push(
-        `evolution_instance_state{instance="${escapeLabel(name)}",integration="${escapeLabel(
+        `evo_instance_state{instance="${escapeLabel(name)}",integration="${escapeLabel(
           integration,
         )}",state="${escapeLabel(state)}"} 1`,
       );
@@ -196,11 +196,11 @@ router
   .get('/', async (req, res) => {
     res.status(HttpStatus.OK).json({
       status: HttpStatus.OK,
-      message: 'Welcome to the Evolution API, it is working!',
+      message: 'Welcome to the evo API, it is working!',
       version: packageJson.version,
       clientName: databaseConfig.CONNECTION.CLIENT_NAME,
       manager: !serverConfig.DISABLE_MANAGER ? `${req.protocol}://${req.get('host')}/manager` : undefined,
-      documentation: `https://doc.evolution-api.com`,
+      documentation: `https://doc.evo-api.com`,
       whatsappWebVersion: (await fetchLatestWaWebVersion({})).version.join('.'),
     });
   })

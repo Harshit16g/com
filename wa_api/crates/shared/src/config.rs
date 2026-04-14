@@ -6,8 +6,8 @@ use std::env;
 pub struct AppConfig {
     pub redis_url: String,
     pub database_url: String,
-    pub evolution_base_url: String,
-    pub evolution_api_key: String,
+    pub evo_base_url: String,
+    pub evo_api_key: String,
     pub alert_webhook_url: Option<String>,
     pub server_port: u16,
     /// 8-15 second randomized delay between sends per instance
@@ -22,8 +22,8 @@ impl AppConfig {
         Ok(AppConfig {
             redis_url: required("REDIS_URL")?,
             database_url: required("DATABASE_URL")?,
-            evolution_base_url: required("EVOLUTION_BASE_URL")?,
-            evolution_api_key: required("EVOLUTION_API_KEY")?,
+            evo_base_url: required("evo_BASE_URL")?,
+            evo_api_key: required("evo_API_KEY")?,
             alert_webhook_url: env::var("ALERT_WEBHOOK_URL").ok(),
             server_port: env::var("PORT")
                 .or_else(|_| env::var("SERVER_PORT"))

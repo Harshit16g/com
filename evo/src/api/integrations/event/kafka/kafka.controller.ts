@@ -33,7 +33,7 @@ export class KafkaController extends EventController implements EventControllerI
       const kafkaConfig = configService.get<Kafka>('KAFKA');
 
       const clientConfig: KafkaConfig = {
-        clientId: kafkaConfig.CLIENT_ID || 'evolution-api',
+        clientId: kafkaConfig.CLIENT_ID || 'evo-api',
         brokers: kafkaConfig.BROKERS || ['localhost:9092'],
         connectionTimeout: kafkaConfig.CONNECTION_TIMEOUT || 3000,
         requestTimeout: kafkaConfig.REQUEST_TIMEOUT || 30000,
@@ -104,7 +104,7 @@ export class KafkaController extends EventController implements EventControllerI
       const kafkaConfig = configService.get<Kafka>('KAFKA');
 
       const consumerConfig: ConsumerConfig = {
-        groupId: kafkaConfig.CONSUMER_GROUP_ID || 'evolution-api-consumers',
+        groupId: kafkaConfig.CONSUMER_GROUP_ID || 'evo-api-consumers',
         sessionTimeout: 30000,
         heartbeatInterval: 3000,
       };
@@ -183,7 +183,7 @@ export class KafkaController extends EventController implements EventControllerI
 
   private getTopicName(event: string, isGlobal: boolean = false, instanceName?: string): string {
     const kafkaConfig = configService.get<Kafka>('KAFKA');
-    const prefix = kafkaConfig.TOPIC_PREFIX || 'evolution';
+    const prefix = kafkaConfig.TOPIC_PREFIX || 'evo';
 
     if (isGlobal) {
       return `${prefix}.global.${event.toLowerCase().replace(/_/g, '.')}`;

@@ -12,7 +12,7 @@ Complete guide for setup, deployment, and operations of the Leaex WhatsApp Engin
 4. [Local Development Setup](#4-local-development-setup)
 5. [Configuration Reference](#5-configuration-reference)
 6. [API Reference](#6-api-reference)
-7. [Evolution API Setup](#7-evolution-api-setup)
+7. [evo API Setup](#7-evo-api-setup)
 8. [Deployment](#8-deployment)
 9. [Scaling](#9-scaling)
 10. [Database Schema](#10-database-schema)
@@ -50,7 +50,7 @@ Partners / Leaex Backend
 │  │  PostgreSQL  │ ◀── all services read/write       │
 │  └──────────────┘                                   │
 └─────────────────────────────────────────────────────┘
-         │  HTTP (Evolution API protocol)
+         │  HTTP (evo API protocol)
          ▼
 ┌──────────────────────────────────────┐
 │  Evo API (standalone)                │
@@ -67,7 +67,7 @@ Partners / Leaex Backend
 | Stack | What's inside | Scale strategy |
 |---|---|---|
 | `docker-compose.yml` | API Gateway + Worker + Scheduler + Pool Manager + Health Monitor + PostgreSQL + Redis | Scale workers horizontally |
-| `docker-compose.evo.yml` | Evolution API + its own PostgreSQL | One instance per agency OR shared pool |
+| `docker-compose.evo.yml` | evo API + its own PostgreSQL | One instance per agency OR shared pool |
 
 ### Key Design Decisions
 
@@ -87,14 +87,14 @@ wa_api/
 ├── Cargo.toml                    # Workspace root
 ├── .env                          # Local dev environment (not committed)
 ├── docker-compose.yml            # wa_api stack (Rust + Postgres + Redis)
-├── docker-compose.evo.yml        # Evolution API (standalone)
+├── docker-compose.evo.yml        # evo API (standalone)
 ├── migrations/
 │   ├── 001_initial_schema.sql    # Schema — auto-applied by Postgres on first start
 │   └── cleanup_supabase_production.sql  # One-time: remove tables from Supabase
 ├── crates/
-│   ├── shared/          # Common types, DB client, Redis client, Evolution client
+│   ├── shared/          # Common types, DB client, Redis client, evo client
 │   ├── api_gateway/     # Axum HTTP server — all partner-facing endpoints
-│   ├── worker/          # Job processor — sends via Evolution API
+│   ├── worker/          # Job processor — sends via evo API
 │   ├── scheduler/       # Promotes scheduled jobs → ready queue (500ms)
 │   ├── pool_manager/    # Manages campaign pool numbers (15min)
 │   └── health_monitor/  # Monitors instance health, fires alerts (5min)
@@ -108,7 +108,7 @@ wa_api/
 ### Required
 - **Rust** 1.78+ with `cargo` — [rustup.rs](https://rustup.rs)
 - **Docker** + **Docker Compose** v2 — for running the full stack
-- **Node.js** 18+ + **npm** — for Evolution API
+- **Node.js** 18+ + **npm** — for evo API
 - **Git** with SSH/HTTPS access to `github.com/Harshit16g/whatsapp-api`
 
 ### Install Docker (Ubuntu/Debian)
@@ -132,7 +132,7 @@ cd ~/projects
 # wa_api (this repo)
 git clone <this-repo> wa_api
 
-# Evolution API (WhatsApp bridge)
+# evo API (WhatsApp bridge)
 git clone git@github.com:Harshit16g/whatsapp-api evo
 ```
 
@@ -148,8 +148,8 @@ Minimum required in `.env`:
 ```env
 DATABASE_URL=postgresql://wa_api:wa_api_secret@localhost:5433/wa_api
 REDIS_URL=redis://localhost:6380
-EVOLUTION_BASE_URL=http://localhost:8081
-EVOLUTION_API_KEY=leaex-evo-api-key-2026
+evo_BASE_URL=http://localhost:8081
+evo_API_KEY=leaex-evo-api-key-2026
 ADMIN_API_KEY=change-me-in-prod
 ```
 
@@ -211,7 +211,7 @@ cargo build --release
 ./target/release/scheduler
 ```
 
-### Step 6 — Start Evolution API
+### Step 6 — Start evo API
 
 ```bash
 cd ~/projects/evo
@@ -226,13 +226,13 @@ npm start
 # Listens on :8081
 ```
 
-`.env` for Evolution API (`~/projects/evo/.env`):
+`.env` for evo API (`~/projects/evo/.env`):
 ```env
 SERVER_PORT=8081
 DATABASE_PROVIDER=postgresql
-DATABASE_CONNECTION_URI=postgresql://evolution:evo_secret@localhost:5432/evolution
+DATABASE_CONNECTION_URI=postgresql://evo:evo_secret@localhost:5432/evo
 AUTHENTICATION_API_KEY=leaex-evo-api-key-2026
-WEBHOOK_GLOBAL_URL=http://localhost:8080/webhook/evolution
+WEBHOOK_GLOBAL_URL=http://localhost:8080/webhook/evo
 WEBHOOK_GLOBAL_ENABLED=true
 WEBHOOK_EVENTS_MESSAGES_UPSERT=true
 WEBHOOK_EVENTS_MESSAGES_UPDATE=true
@@ -282,8 +282,8 @@ All configuration is via environment variables. Values shown are defaults.
 |---|---|---|---|
 | `DATABASE_URL` | Yes | — | PostgreSQL connection string. Format: `postgresql://user:pass@host:port/db` |
 | `REDIS_URL` | Yes | — | Redis connection string. `redis://host:port` or `rediss://...` for TLS |
-| `EVOLUTION_BASE_URL` | Yes | — | Base URL of the Evolution API instance, e.g. `http://localhost:8081` |
-| `EVOLUTION_API_KEY` | Yes | — | Must match `AUTHENTICATION_API_KEY` in Evolution API |
+| `evo_BASE_URL` | Yes | — | Base URL of the evo API instance, e.g. `http://localhost:8081` |
+| `evo_API_KEY` | Yes | — | Must match `AUTHENTICATION_API_KEY` in evo API |
 | `SERVER_PORT` | No | `8080` | API Gateway listen port |
 | `ADMIN_API_KEY` | Yes | — | Secret key for admin endpoints (`x-admin-key` header) |
 | `WORKER_COUNT` | No | `4` | Number of concurrent send goroutines per worker process |
@@ -298,9 +298,9 @@ When running with `docker compose`, create a `.env` in `wa_api/` with:
 
 ```env
 POSTGRES_PASSWORD=your_strong_password
-EVOLUTION_API_KEY=your-evolution-key
+evo_API_KEY=your-evo-key
 ADMIN_API_KEY=your-admin-key
-EVOLUTION_BASE_URL=http://evolution_api:8080   # if running in same network
+evo_BASE_URL=http://evo_api:8080   # if running in same network
 ALERT_WEBHOOK_URL=https://hooks.slack.com/services/...
 WORKER_REPLICAS=4        # number of worker containers
 GATEWAY_PORT=8080        # host port for API gateway
@@ -473,27 +473,27 @@ Cross-tenant interaction log.
 
 ---
 
-### POST /webhook/evolution
+### POST /webhook/evo
 
-**No auth required.** Called by Evolution API to deliver:
+**No auth required.** Called by evo API to deliver:
 - `messages.update` — delivery receipts (SENT → DELIVERED → READ)
 - `messages.upsert` — incoming messages; handles `STOP`/`UNSUBSCRIBE` keyword for platform-wide opt-out
 - `connection.update` — instance state changes; updates Redis health cache
 
-This URL must be configured as `WEBHOOK_GLOBAL_URL` in your Evolution API `.env`.
+This URL must be configured as `WEBHOOK_GLOBAL_URL` in your evo API `.env`.
 
 ---
 
-## 7. Evolution API Setup
+## 7. evo API Setup
 
-Evolution API is the WhatsApp bridge layer. It manages the actual WhatsApp Web sessions.
+evo API is the WhatsApp bridge layer. It manages the actual WhatsApp Web sessions.
 
 ### Creating a partner instance
 
 ```bash
 # Create a new instance
 curl -X POST http://localhost:8081/instance/create \
-  -H "apikey: <EVOLUTION_API_KEY>" \
+  -H "apikey: <evo_API_KEY>" \
   -H "Content-Type: application/json" \
   -d '{
     "instanceName": "wa_partner_salon_xyz",
@@ -503,7 +503,7 @@ curl -X POST http://localhost:8081/instance/create \
 
 # Get the QR code to scan
 curl http://localhost:8081/instance/connect/wa_partner_salon_xyz \
-  -H "apikey: <EVOLUTION_API_KEY>"
+  -H "apikey: <evo_API_KEY>"
 # Response contains base64 QR image — decode and scan with WhatsApp
 ```
 
@@ -517,7 +517,7 @@ INSERT INTO tenants (id, agency_id, instance_name, wa_number, instance_status, c
 VALUES (
   gen_random_uuid(),
   '<agency_id>',
-  'wa_partner_salon_xyz',     -- must match instanceName in Evolution API exactly
+  'wa_partner_salon_xyz',     -- must match instanceName in evo API exactly
   '+919876543210',            -- the number that was connected
   'active',
   false                       -- set true for Pro/Enterprise
@@ -529,9 +529,9 @@ VALUES (
 Pool numbers are shared platform instances used only for bulk campaigns (never CRM).
 
 ```bash
-# Register a pool number in Evolution API
+# Register a pool number in evo API
 curl -X POST http://localhost:8081/instance/create \
-  -H "apikey: <EVOLUTION_API_KEY>" \
+  -H "apikey: <evo_API_KEY>" \
   -H "Content-Type: application/json" \
   -d '{"instanceName":"pool_number_01","qrcode":true,"integration":"WHATSAPP-BAILEYS"}'
 
@@ -557,9 +557,9 @@ Pool numbers go through a **warmup sequence**:
 # wa_api/
 cat > .env << 'EOF'
 POSTGRES_PASSWORD=<strong-random-password>
-EVOLUTION_API_KEY=<strong-random-key>
+evo_API_KEY=<strong-random-key>
 ADMIN_API_KEY=<strong-random-key>
-EVOLUTION_BASE_URL=http://evolution_api:8080
+evo_BASE_URL=http://evo_api:8080
 ALERT_WEBHOOK_URL=https://hooks.slack.com/services/T.../B.../...
 WORKER_REPLICAS=4
 GATEWAY_PORT=8080
@@ -580,13 +580,13 @@ docker compose ps
 docker compose logs -f --tail=50
 ```
 
-**Step 3 — Start Evolution API**
+**Step 3 — Start evo API**
 
 ```bash
 # Create .env for evo
 cat > .env << 'EOF'
 EVO_POSTGRES_PASSWORD=<another-strong-password>
-EVOLUTION_API_KEY=<same-key-as-wa-api>
+evo_API_KEY=<same-key-as-wa-api>
 WA_API_WEBHOOK_URL=http://<wa-api-host>:8080
 EVO_PORT=8081
 EOF
@@ -619,7 +619,7 @@ Railway supports multi-service deployments from a monorepo.
    - `Dockerfile.health` → service `health_monitor`
 4. Set all env vars in Railway dashboard (no `.env` file needed).
 5. Set `DATABASE_URL` and `REDIS_URL` to the Railway-provided values.
-6. Deploy Evolution API as a separate Railway project (or separate service) with its own Postgres.
+6. Deploy evo API as a separate Railway project (or separate service) with its own Postgres.
 
 **Apply schema on first deploy:**
 ```bash
@@ -642,19 +642,19 @@ docker compose up --scale worker=8 -d
 WORKER_REPLICAS=2 docker compose up -d
 ```
 
-**Concurrency safety**: Workers use a per-instance Redis SETNX lock (`send_lock:<instance>`, 30s TTL) so multiple workers can never send on the same Evolution API instance simultaneously.
+**Concurrency safety**: Workers use a per-instance Redis SETNX lock (`send_lock:<instance>`, 30s TTL) so multiple workers can never send on the same evo API instance simultaneously.
 
-### Evolution API scaling
+### evo API scaling
 
-Each Evolution API instance can handle multiple WhatsApp sessions (one per instance name).
+Each evo API instance can handle multiple WhatsApp sessions (one per instance name).
 
 To handle more agencies/partners:
 ```bash
-# Scale to 3 Evolution API containers (behind a load balancer)
-docker compose -f docker-compose.evo.yml up --scale evolution_api=3 -d
+# Scale to 3 evo API containers (behind a load balancer)
+docker compose -f docker-compose.evo.yml up --scale evo_api=3 -d
 ```
 
-**Important**: All Evolution API containers must share the same database so sessions are visible across containers. This is handled by the shared `evo_postgres` service.
+**Important**: All evo API containers must share the same database so sessions are visible across containers. This is handled by the shared `evo_postgres` service.
 
 ### Database scaling
 
@@ -688,7 +688,7 @@ Each tenant is a salon partner with their own WhatsApp instance.
 | `id` | UUID | PK |
 | `agency_id` | UUID | FK → agencies |
 | `partner_id` | UUID | Links to Leaex partners table (nullable) |
-| `instance_name` | TEXT UNIQUE | Evolution API instance identifier |
+| `instance_name` | TEXT UNIQUE | evo API instance identifier |
 | `wa_number` | TEXT | Connected WhatsApp number (`+91XXXXXXXXXX`) |
 | `instance_status` | TEXT | `active` / `qr_required` / `disconnected` / `banned` / `suspended` |
 | `daily_crm_limit` | INTEGER | Max CRM messages per day for this tenant |
@@ -723,7 +723,7 @@ Immutable audit log of every message attempt.
 | `recipient_phone_masked` | TEXT | `+91 XXXXX X1234` |
 | `instance_used` | TEXT | `leaex_pool` for campaigns, instance name for CRM |
 | `status` | TEXT | `pending` / `sent` / `delivered` / `read` / `failed` / `deferred_spam` / `blocked_optout` / `duplicate` |
-| `evolution_msg_id` | TEXT | Message ID returned by Evolution API |
+| `evo_msg_id` | TEXT | Message ID returned by evo API |
 | `idempotency_key` | TEXT UNIQUE | Prevents duplicate sends |
 
 ### wa_customer_consent
@@ -835,10 +835,10 @@ When an instance shows `qr_required` or `disconnected`:
 1. **Get a fresh QR:**
    ```bash
    curl http://localhost:8081/instance/connect/<instance_name> \
-     -H "apikey: <EVOLUTION_API_KEY>"
+     -H "apikey: <evo_API_KEY>"
    ```
 2. **Scan with WhatsApp** on the partner's phone.
-3. **Evolution API fires a webhook** (`connection.update` → `open`) to `POST /webhook/evolution`.
+3. **evo API fires a webhook** (`connection.update` → `open`) to `POST /webhook/evo`.
 4. **Health Monitor** updates Redis: `instance_health:<instance_name>` → `ACTIVE`.
 5. **Worker** resumes sending for that instance automatically.
 
@@ -908,8 +908,8 @@ docker compose exec redis redis-cli GET instance_health:<instance_name>
 ```
 
 **Fix:**
-- `DISCONNECTED` → scan QR or restart Evolution API instance
-- `QR_REQUIRED` → force re-authentication via Evolution API manager
+- `DISCONNECTED` → scan QR or restart evo API instance
+- `QR_REQUIRED` → force re-authentication via evo API manager
 - `BANNED` → instance is banned from WhatsApp; retire it, register a replacement
 - Missing key → Health Monitor hasn't run yet; wait 5min or set manually
 
@@ -940,17 +940,17 @@ pkill -f target/release/worker
 ./target/release/worker &
 ```
 
-### Evolution API returns 401 on send
+### evo API returns 401 on send
 
-The `EVOLUTION_API_KEY` in `wa_api/.env` doesn't match `AUTHENTICATION_API_KEY` in `evo/.env`.
+The `evo_API_KEY` in `wa_api/.env` doesn't match `AUTHENTICATION_API_KEY` in `evo/.env`.
 
 **Fix:** Set both to the same value and restart both services.
 
-### "Instance disconnected" errors after Evolution API restart
+### "Instance disconnected" errors after evo API restart
 
-Evolution API sessions are stored in the `instances/` volume. If the volume is lost, all sessions need re-authentication.
+evo API sessions are stored in the `instances/` volume. If the volume is lost, all sessions need re-authentication.
 
-**With Docker Compose**, the `evolution_instances` named volume persists across restarts. Never run `docker compose down -v` in production.
+**With Docker Compose**, the `evo_instances` named volume persists across restarts. Never run `docker compose down -v` in production.
 
 ### Database connection errors on startup
 

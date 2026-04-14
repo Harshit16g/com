@@ -46,6 +46,6 @@ volumes:
 
 
 networks:
-  evolution-net:
-    name: evolution-net
+  evo-net:
+    name: evo-net
     driver: bridge

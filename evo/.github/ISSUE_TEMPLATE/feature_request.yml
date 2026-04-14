@@ -9,7 +9,7 @@ body:
     attributes:
       value: |
         Thanks for suggesting a new feature! 
-        Please check our [Feature Requests on Canny](https://evolutionapi.canny.io/feature-requests) first.
+        Please check our [Feature Requests on Canny](https://evoapi.canny.io/feature-requests) first.
 
   - type: textarea
     id: problem

@@ -1,8 +1,8 @@
 {
   "dashboard": {
     "id": null,
-    "title": "Evolution API Monitoring",
-    "tags": ["evolution-api", "whatsapp", "monitoring"],
+    "title": "evo API Monitoring",
+    "tags": ["evo-api", "whatsapp", "monitoring"],
     "style": "dark",
     "timezone": "browser",
     "panels": [
@@ -12,7 +12,7 @@
         "type": "stat",
         "targets": [
           {
-            "expr": "up{job=\"evolution-api\"}",
+            "expr": "up{job=\"evo-api\"}",
             "legendFormat": "API Status"
           }
         ],
@@ -48,7 +48,7 @@
         "type": "stat",
         "targets": [
           {
-            "expr": "evolution_instances_total",
+            "expr": "evo_instances_total",
             "legendFormat": "Total Instances"
           }
         ],
@@ -65,7 +65,7 @@
         "type": "piechart",
         "targets": [
           {
-            "expr": "sum by (state) (evolution_instance_state)",
+            "expr": "sum by (state) (evo_instance_state)",
             "legendFormat": "{{ state }}"
           }
         ],
@@ -82,7 +82,7 @@
         "type": "piechart",
         "targets": [
           {
-            "expr": "sum by (integration) (evolution_instance_up)",
+            "expr": "sum by (integration) (evo_instance_up)",
             "legendFormat": "{{ integration }}"
           }
         ],
@@ -99,7 +99,7 @@
         "type": "table",
         "targets": [
           {
-            "expr": "evolution_instance_up",
+            "expr": "evo_instance_up",
             "format": "table",
             "instant": true
           }
@@ -163,7 +163,7 @@
         "type": "timeseries",
         "targets": [
           {
-            "expr": "evolution_instance_up",
+            "expr": "evo_instance_up",
             "legendFormat": "{{ instance }} ({{ integration }})"
           }
         ],

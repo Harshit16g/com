@@ -27,7 +27,7 @@ serde_json = "1"
 fred = { version = "9", features = ["enable-native-tls"] }
 native-tls = "0.2"
 
-# HTTP client (for Evolution API calls + Slack alerts)
+# HTTP client (for evo API calls + Slack alerts)
 reqwest = { version = "0.12", features = ["json", "rustls-tls"], default-features = false }
 
 # Database (bundled Postgres via sqlx)

@@ -13,7 +13,7 @@ Cross-Partner Spam Guard*
   Supersedes                          Leaex_WhatsApp_Integration_v2_Amendment.docx
 
   Architecture                        Rust (Axum + Tokio) + Redis + Supabase +
-                                      Evolution API
+                                      evo API
 
   Key Additions                       Campaign pool numbers, cross-partner spam
                                       guard, partner visibility scoping
@@ -23,22 +23,22 @@ Cross-Partner Spam Guard*
   Classification                      Internal \-- Engineering & Product Teams
   ----------------------------------------------------------------------------------
 
-# 0. Evolution API \-- Known Constraints & Why This Architecture Solves Them
+# 0. evo API \-- Known Constraints & Why This Architecture Solves Them
 
-Evolution API is a self-hosted WhatsApp Web bridge. It is cost-effective
+evo API is a self-hosted WhatsApp Web bridge. It is cost-effective
 and gives per-partner instance isolation, but it has hard operational
 constraints that shaped every architectural decision in this document.
 Understanding these constraints is mandatory before reading the rest of
 the spec.
 
-## 0.1 Evolution API Constraint Register
+## 0.1 evo API Constraint Register
 
   --------------------------------------------------------------------------
   **Constraint**    **Root Cause**    **Severity**      **How This
                                                         Architecture
                                                         Mitigates It**
   ----------------- ----------------- ----------------- --------------------
-  Session is a      Evolution API     HIGH              Campaign pool
+  Session is a      evo API     HIGH              Campaign pool
   WhatsApp Web      connects via                        numbers use official
   browser session   WhatsApp Web                        WABA for broadcast.
   \-- not the       protocol. Meta                      Partner personal
@@ -47,10 +47,10 @@ the spec.
                                                         within safe rate
                                                         limits.
 
-  No native message Evolution has no  HIGH              All sends go through
+  No native message evo has no  HIGH              All sends go through
   queue \--         internal queue.                     our Rust worker
-  Evolution API     Concurrent POSTs                    pool + Redis ZSET
-  sends immediately flood the session                   scheduler. Evolution
+  evo API     Concurrent POSTs                    pool + Redis ZSET
+  sends immediately flood the session                   scheduler. evo
   or drops          and trigger bans.                   API never receives
                                                         concurrent requests
                                                         for the same
@@ -66,7 +66,7 @@ the spec.
                                                         spike above
                                                         threshold.
 
-  Instance crashes  Evolution API     HIGH              Worker pool polls
+  Instance crashes  evo API     HIGH              Worker pool polls
   are silent        process dies                        instance health
                     without emitting                    endpoint before each
                     an error to the                     send batch. Dead
@@ -76,19 +76,19 @@ the spec.
                     never delivered.                    retried on same
                                                         instance.
 
-  No delivery       Evolution         MEDIUM            Supabase stores
+  No delivery       evo         MEDIUM            Supabase stores
   receipt webhook   WebSocket                           last-known status.
   reliability       disconnect causes                   Redis tracks
                     webhook events to                   in-flight sends.
                     be lost. Delivery                   Reconciliation
                     status becomes                      worker polls
-                    stale.                              Evolution status
+                    stale.                              evo status
                                                         every 5 minutes for
                                                         in-flight records
                                                         older than 10
                                                         minutes.
 
-  Multi-instance    Each Evolution    HIGH              Rust Tenant Resolver
+  Multi-instance    Each evo    HIGH              Rust Tenant Resolver
   state not shared  API instance is                     maintains
                     an isolated                         instance-to-tenant
                     process. There is                   mapping in Redis.
@@ -99,7 +99,7 @@ the spec.
 
   QR re-auth        WhatsApp Web      MEDIUM            Session health
   required          sessions expire.                    monitor detects
-  periodically      Evolution                           QR_REQUIRED state
+  periodically      evo                           QR_REQUIRED state
                     requires QR                         and fires
                     rescan or pairing                   Slack/webhook alert
                     code re-entry.                      to partner. Sends
@@ -208,7 +208,7 @@ x-api-key + tenant_id
 
 \| \|
 
-Evolution API Evolution API
+evo API evo API
 
 \| \|
 
@@ -222,7 +222,7 @@ WhatsApp WhatsApp
   ------------ ---------------- ---------------------- ------------ ---------------- -------------
   Partner      Partner          1:1 CRM: booking       1 msg /      MEDIUM \--       Yes \--
   Personal     self-registers   confirmations,         10-20s. Max  controlled by    partner sees
-  Instance     via Evolution    reminders,             200 unique   our rate         send history
+  Instance     via evo    reminders,             200 unique   our rate         send history
                API QR scan.     birthday/anniversary   recipients   limiter.         from their
                Leaex manages    wishes, individual     per day.                      own number.
                the session.     follow-ups triggered                                 
@@ -233,7 +233,7 @@ WhatsApp WhatsApp
                manages. A pool  message to a recipient pool number. warmed up. Never campaign
                of numbers       list \> 20 numbers.    Load         used for         results
                registered as                           balanced     personal-style   (delivered,
-               Evolution API                           across pool. messages.        read, failed
+               evo API                           across pool. messages.        read, failed
                instances, not                          Max 500                       counts) but
                linked to any                           msgs/day per                  NOT the
                specific                                pool number.                  originating
@@ -278,7 +278,7 @@ the pool from misuse and the partner from Meta scrutiny.*
 
   4\. Instance Map        Resolve tenant -\>           503 if instance not
                           wa_instance_name -\>         found. 409 if instance
-                          Evolution API instance.      in QR_REQUIRED state
+                          evo API instance.      in QR_REQUIRED state
                                                        (needs re-auth).
 
   5\. Payload Validation  Validate request body:       422 Unprocessable
@@ -365,7 +365,7 @@ tenant_id: Uuid,
 
 partner_id: Uuid, // maps to Leaex partner/salon
 
-instance_name: String, // Evolution API instance identifier
+instance_name: String, // evo API instance identifier
 
 wa_number: String, // +91XXXXXXXXXX of the connected WA number
 
@@ -415,7 +415,7 @@ personal instances are protected entirely.
                                       partner\'s name or business.
 
   Instance Management                 Each pool number has its own
-                                      Evolution API instance on the
+                                      evo API instance on the
                                       platform server. Named:
                                       pool_leaex_01, pool_leaex_02, etc.
 
@@ -774,7 +774,7 @@ is possible from this store.*
   -----------------------------------------------------------------------
   **Scenario**                        **Behaviour**
   ----------------------------------- -----------------------------------
-  Customer replies \"STOP\" to any    Evolution API webhook fires. Rust
+  Customer replies \"STOP\" to any    evo API webhook fires. Rust
   Leaex message (pool number or       worker processes STOP keyword.
   partner number)                     wa_customer_consent table updated:
                                       opted_out = true for this
@@ -875,7 +875,7 @@ partner_id: Uuid,
 
 campaign_id: Option\<Uuid\>, // None for CRM direct messages
 
-instance_name: String, // which Evolution API instance to use
+instance_name: String, // which evo API instance to use
 
 message_type: MessageType, // Campaign \| CrmDirect
 
@@ -956,7 +956,7 @@ sleep(Duration::from_millis(500)); // 500ms scheduler tick
 
   Worker Count (Phase 1)              4 concurrent workers. Enough for
                                       \~20 active partners without
-                                      exceeding Evolution API capacity.
+                                      exceeding evo API capacity.
 
   Worker Count (Phase 2)              Scale to 16 workers. Each worker
                                       handles a dedicated queue shard.
@@ -980,8 +980,8 @@ sleep(Duration::from_millis(500)); // 500ms scheduler tick
 
 ## 7.2 Worker Send Flow (per job)
 
-async fn process_job(job: WhatsAppJob, redis: &Redis, evolution:
-&EvolutionClient) {
+async fn process_job(job: WhatsAppJob, redis: &Redis, evo:
+&evoClient) {
 
 // Step 1: Instance health check
 
@@ -1028,9 +1028,9 @@ mark_duplicate(&job); return;
 
 }
 
-// Step 5: Send via Evolution API
+// Step 5: Send via evo API
 
-let result = evolution.send_text(
+let result = evo.send_text(
 
 &job.instance_name, &job.recipient_phone, &job.payload
 
@@ -1094,7 +1094,7 @@ Err(e) =\> { move_to_dlq(&job, &e.to_string()); }
                                                   Alert fired if not
                                                   recovered after 1h.
 
-  Concurrent sends per    1\. Evolution API       Non-negotiable. Worker
+  Concurrent sends per    1\. evo API       Non-negotiable. Worker
   instance                instances are           acquires per-instance
                           single-threaded.        lock (Redis SETNX)
                                                   before sending. Lock
@@ -1111,33 +1111,33 @@ Err(e) =\> { move_to_dlq(&job, &e.to_string()); }
   **Error Type**    **Examples**           **Retry?**        **Strategy**
   ----------------- ---------------------- ----------------- -----------------------------
   Network /         Connection timeout to  YES               Exponential backoff: +30s,
-  transient         Evolution API, HTTP                      +2min, +10min. Max 3 retries
-                    503, Evolution process                   then DLQ.
+  transient         evo API, HTTP                      +2min, +10min. Max 3 retries
+                    503, evo process                   then DLQ.
                     restart.                                 
 
-  Evolution rate    HTTP 429 from          YES               Respect Retry-After header.
-  limit             Evolution API (too                       If none: wait 60s. Do NOT
+  evo rate    HTTP 429 from          YES               Respect Retry-After header.
+  limit             evo API (too                       If none: wait 60s. Do NOT
                     many concurrent                          retry immediately.
                     requests to same                         
                     instance).                               
 
-  Instance          Evolution returns      PAUSE             Move all jobs for this
+  Instance          evo returns      PAUSE             Move all jobs for this
   disconnected      instance_not_found or                    instance to PAUSED state.
                     session_closed.                          Fire health alert. Resume
                                                              when instance reconnects.
 
-  QR re-auth        Evolution returns      NO                Move all jobs for this tenant
+  QR re-auth        evo returns      NO                Move all jobs for this tenant
   required          qr_required or                           to DLQ with
                     auth_failed.                             reason=instance_needs_auth.
                                                              Partner must reconnect. Jobs
                                                              held 7 days.
 
-  Invalid recipient Evolution returns      NO                Mark as FAILED permanently.
+  Invalid recipient evo returns      NO                Mark as FAILED permanently.
                     invalid_number,                          Log to Supabase. Do NOT retry
                     not_on_whatsapp.                         \-- wastes quota and flags
                                                              number.
 
-  Banned instance   Evolution returns      NO \-- ESCALATE   Move ALL jobs for instance to
+  Banned instance   evo returns      NO \-- ESCALATE   Move ALL jobs for instance to
                     banned or                                DLQ. Alert ops team
                     account_restricted.                      immediately. Instance
                                                              quarantined.
@@ -1236,7 +1236,7 @@ but require service_role key.
   partner_id              uuid REFERENCES         Links to the Leaex
                           partners(id)            partner/salon record.
 
-  instance_name           text UNIQUE             Evolution API instance
+  instance_name           text UNIQUE             evo API instance
                                                   identifier: e.g.
                                                   \"wa_glamour_studio_01\"
 
@@ -1288,7 +1288,7 @@ but require service_role key.
                                                   send.
 
   delivered_count         integer DEFAULT 0       Incremented by
-                                                  Evolution webhook on
+                                                  evo webhook on
                                                   delivery receipt.
 
   failed_count            integer DEFAULT 0       
@@ -1336,7 +1336,7 @@ but require service_role key.
                                                    XXXXX X1234. Shown in
                                                    partner UI.
 
-  instance_used            text                    Evolution instance
+  instance_used            text                    evo instance
                                                    name. For pool sends:
                                                    shows \"leaex_pool\"
                                                    (never pool number
@@ -1349,8 +1349,8 @@ but require service_role key.
                            duplicate \|            
                            expired_dlq             
 
-  evolution_msg_id         text NULLABLE           Message ID returned by
-                                                   Evolution API on
+  evo_msg_id         text NULLABLE           Message ID returned by
+                                                   evo API on
                                                    success.
 
   error_reason             text NULLABLE           Human-readable error
@@ -1422,7 +1422,7 @@ but require service_role key.
 
   new_status              text                    
 
-  detail                  jsonb                   Raw Evolution API
+  detail                  jsonb                   Raw evo API
                                                   response or error
                                                   detail.
 
@@ -1562,11 +1562,11 @@ environment:
 
 \- REDIS_URL=redis://redis:6379
 
-\- EVOLUTION_BASE_URL=http://evolution_api:8080
+\- evo_BASE_URL=http://evo_api:8080
 
 \- SUPABASE_URL=\${SUPABASE_URL}
 
-depends_on: \[redis, evolution_api\]
+depends_on: \[redis, evo_api\]
 
 restart: unless-stopped
 
@@ -1578,7 +1578,7 @@ environment:
 
 \- REDIS_URL=redis://redis:6379
 
-\- EVOLUTION_BASE_URL=http://evolution_api:8080
+\- evo_BASE_URL=http://evo_api:8080
 
 restart: unless-stopped
 
@@ -1590,25 +1590,25 @@ environment:
 
 \- REDIS_URL=redis://redis:6379
 
-\- EVOLUTION_BASE_URL=http://evolution_api:8080
+\- evo_BASE_URL=http://evo_api:8080
 
 \- ALERT_WEBHOOK=\${SLACK_WEBHOOK_URL}
 
 restart: unless-stopped
 
-evolution_api:
+evo_api:
 
-image: atendai/evolution-api:latest
+image: atendai/evo-api:latest
 
 ports: \[\"8081:8080\"\]
 
 volumes:
 
-\- evolution_data:/evolution/instances
+\- evo_data:/evo/instances
 
 environment:
 
-\- AUTHENTICATION_API_KEY=\${EVOLUTION_API_KEY}
+\- AUTHENTICATION_API_KEY=\${evo_API_KEY}
 
 restart: unless-stopped
 
@@ -1638,7 +1638,7 @@ restart: unless-stopped
   Manager + Health        combined                
   Monitor                                         
 
-  Evolution API           Railway \-- 1GB RAM     \~Rs.1,200
+  evo API           Railway \-- 1GB RAM     \~Rs.1,200
                           (session data           
                           persistent)             
 
@@ -1694,8 +1694,8 @@ restart: unless-stopped
 
   Week 2            5 days            Worker pool       End-to-end: enqueue
                                       (Tokio, 4         job -\> worker picks
-                                      workers).         up -\> Evolution API
-                                      Evolution API     sends. Instance
+                                      workers).         up -\> evo API
+                                      evo API     sends. Instance
                                       integration.      health check before
                                       BRPOP-based job   send. Rate limit
                                       consumption.      (8-15s delay)
@@ -1741,7 +1741,7 @@ restart: unless-stopped
                                       worker. Sentry    for stale in-flight
                                       integration.      records. Production
                                       Deploy to         deploy. Smoke test
-                                      Railway.          with real Evolution
+                                      Railway.          with real evo
                                                         API instance.
   ---------------------------------------------------------------------------
 

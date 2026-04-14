@@ -1,27 +1,27 @@
 import { PrismaRepository } from '@api/repository/repository.service';
 import { WAMonitoringService } from '@api/services/monitor.service';
 import { Logger } from '@config/logger.config';
-import { EvolutionBot, IntegrationSession } from '@prisma/client';
+import { evoBot, IntegrationSession } from '@prisma/client';
 
 import { BaseChatbotController } from '../../base-chatbot.controller';
-import { EvolutionBotDto } from '../dto/evolutionBot.dto';
-import { EvolutionBotService } from '../services/evolutionBot.service';
+import { evoBotDto } from '../dto/evoBot.dto';
+import { evoBotService } from '../services/evoBot.service';
 
-export class EvolutionBotController extends BaseChatbotController<EvolutionBot, EvolutionBotDto> {
+export class evoBotController extends BaseChatbotController<evoBot, evoBotDto> {
   constructor(
-    private readonly evolutionBotService: EvolutionBotService,
+    private readonly evoBotService: evoBotService,
     prismaRepository: PrismaRepository,
     waMonitor: WAMonitoringService,
   ) {
     super(prismaRepository, waMonitor);
 
-    this.botRepository = this.prismaRepository.evolutionBot;
-    this.settingsRepository = this.prismaRepository.evolutionBotSetting;
+    this.botRepository = this.prismaRepository.evoBot;
+    this.settingsRepository = this.prismaRepository.evoBotSetting;
     this.sessionRepository = this.prismaRepository.integrationSession;
   }
 
-  public readonly logger = new Logger('EvolutionBotController');
-  protected readonly integrationName = 'EvolutionBot';
+  public readonly logger = new Logger('evoBotController');
+  protected readonly integrationName = 'evoBot';
 
   integrationEnabled = true; // Set to true by default or use config value if available
   botRepository: any;
@@ -40,10 +40,10 @@ export class EvolutionBotController extends BaseChatbotController<EvolutionBot, 
   }
 
   protected getIntegrationType(): string {
-    return 'evolution';
+    return 'evo';
   }
 
-  protected getAdditionalBotData(data: EvolutionBotDto): Record<string, any> {
+  protected getAdditionalBotData(data: evoBotDto): Record<string, any> {
     return {
       apiUrl: data.apiUrl,
       apiKey: data.apiKey,
@@ -51,7 +51,7 @@ export class EvolutionBotController extends BaseChatbotController<EvolutionBot, 
   }
 
   // Implementation for bot-specific updates
-  protected getAdditionalUpdateFields(data: EvolutionBotDto): Record<string, any> {
+  protected getAdditionalUpdateFields(data: evoBotDto): Record<string, any> {
     return {
       apiUrl: data.apiUrl,
       apiKey: data.apiKey,
@@ -62,7 +62,7 @@ export class EvolutionBotController extends BaseChatbotController<EvolutionBot, 
   protected async validateNoDuplicatesOnUpdate(
     botId: string,
     instanceId: string,
-    data: EvolutionBotDto,
+    data: evoBotDto,
   ): Promise<void> {
     const checkDuplicate = await this.botRepository.findFirst({
       where: {
@@ -76,7 +76,7 @@ export class EvolutionBotController extends BaseChatbotController<EvolutionBot, 
     });
 
     if (checkDuplicate) {
-      throw new Error('Evolution Bot already exists');
+      throw new Error('evo Bot already exists');
     }
   }
 
@@ -84,13 +84,13 @@ export class EvolutionBotController extends BaseChatbotController<EvolutionBot, 
   protected async processBot(
     instance: any,
     remoteJid: string,
-    bot: EvolutionBot,
+    bot: evoBot,
     session: IntegrationSession,
     settings: any,
     content: string,
     pushName?: string,
     msg?: any,
   ) {
-    await this.evolutionBotService.process(instance, remoteJid, bot, session, settings, content, pushName, msg);
+    await this.evoBotService.process(instance, remoteJid, bot, session, settings, content, pushName, msg);
   }
 }

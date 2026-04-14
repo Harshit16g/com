@@ -3,7 +3,7 @@ import { PrismaRepository } from '@api/repository/repository.service';
 import { WAMonitoringService } from '@api/services/monitor.service';
 import { Integration } from '@api/types/wa.types';
 import { ConfigService, HttpServer } from '@config/env.config';
-import { EvolutionBot, EvolutionBotSetting, IntegrationSession } from '@prisma/client';
+import { evoBot, evoBotSetting, IntegrationSession } from '@prisma/client';
 import { sendTelemetry } from '@utils/sendTelemetry';
 import axios from 'axios';
 import { isURL } from 'class-validator';
@@ -11,7 +11,7 @@ import { isURL } from 'class-validator';
 import { BaseChatbotService } from '../../base-chatbot.service';
 import { OpenaiService } from '../../openai/services/openai.service';
 
-export class EvolutionBotService extends BaseChatbotService<EvolutionBot, EvolutionBotSetting> {
+export class evoBotService extends BaseChatbotService<evoBot, evoBotSetting> {
   private openaiService: OpenaiService;
 
   constructor(
@@ -20,7 +20,7 @@ export class EvolutionBotService extends BaseChatbotService<EvolutionBot, Evolut
     configService: ConfigService,
     openaiService: OpenaiService,
   ) {
-    super(waMonitor, prismaRepository, 'EvolutionBotService', configService);
+    super(waMonitor, prismaRepository, 'evoBotService', configService);
     this.openaiService = openaiService;
   }
 
@@ -28,17 +28,17 @@ export class EvolutionBotService extends BaseChatbotService<EvolutionBot, Evolut
    * Get the bot type identifier
    */
   protected getBotType(): string {
-    return 'evolution';
+    return 'evo';
   }
 
   /**
-   * Send a message to the Evolution Bot API
+   * Send a message to the evo Bot API
    */
   protected async sendMessageToBot(
     instance: any,
     session: IntegrationSession,
-    settings: EvolutionBotSetting,
-    bot: EvolutionBot,
+    settings: evoBotSetting,
+    bot: evoBot,
     remoteJid: string,
     pushName: string,
     content: string,
@@ -62,13 +62,13 @@ export class EvolutionBotService extends BaseChatbotService<EvolutionBot, Evolut
 
       if (this.isAudioMessage(content) && msg) {
         try {
-          this.logger.debug(`[EvolutionBot] Downloading audio for Whisper transcription`);
+          this.logger.debug(`[evoBot] Downloading audio for Whisper transcription`);
           const transcription = await this.openaiService.speechToText(msg, instance);
           if (transcription) {
             payload.query = `[audio] ${transcription}`;
           }
         } catch (err) {
-          this.logger.error(`[EvolutionBot] Failed to transcribe audio: ${err}`);
+          this.logger.error(`[evoBot] Failed to transcribe audio: ${err}`);
         }
       }
 
@@ -102,7 +102,7 @@ export class EvolutionBotService extends BaseChatbotService<EvolutionBot, Evolut
       const endpoint = bot.apiUrl;
 
       if (!endpoint) {
-        this.logger.error('No Evolution Bot endpoint defined');
+        this.logger.error('No evo Bot endpoint defined');
         return;
       }
 
@@ -151,7 +151,7 @@ export class EvolutionBotService extends BaseChatbotService<EvolutionBot, Evolut
         // Use the base class method that handles splitMessages functionality
         await this.sendMessageWhatsApp(instance, remoteJid, message, settings, linkPreview);
       } else {
-        this.logger.warn(`[EvolutionBot] No message content received from bot response`);
+        this.logger.warn(`[evoBot] No message content received from bot response`);
       }
 
       // Send telemetry

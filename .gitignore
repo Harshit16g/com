@@ -32,7 +32,7 @@ Thumbs.db
 wa_api/target/
 evo/node_modules/
 evo/dist/
-evolution_instances/
+evo_instances/
 postgres_data/
 redis_data/
 evo_postgres_data/

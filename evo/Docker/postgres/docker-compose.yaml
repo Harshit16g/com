@@ -5,8 +5,8 @@ services:
     container_name: postgres
     image: postgres:15
     networks:
-      - evolution-net
-    command: ["postgres", "-c", "max_connections=1000"]
+      - evo-net
+    command: [ "postgres", "-c", "max_connections=1000" ]
     restart: always
     ports:
       - 5432:5432
@@ -20,10 +20,10 @@ services:
   pgadmin:
     image: dpage/pgadmin4:latest
     networks:
-      - evolution-net
+      - evo-net
     environment:
       - PGADMIN_DEFAULT_EMAIL=EMAIL
-      - PGADMIN_DEFAULT_PASSWORD=PASSWORD  
+      - PGADMIN_DEFAULT_PASSWORD=PASSWORD
     volumes:
       - pgadmin_data:/var/lib/pgadmin
     ports:
@@ -37,6 +37,6 @@ volumes:
 
 
 networks:
-  evolution-net:
-    name: evolution-net
+  evo-net:
+    name: evo-net
     driver: bridge

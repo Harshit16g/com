@@ -167,7 +167,7 @@ export class SqsController extends EventController implements EventControllerInt
 
         const messageGroupId = sqsConfig.GLOBAL_ENABLED
           ? `${serverConfig.NAME}-${eventFormatted}-${instanceName}`
-          : 'evolution';
+          : 'evo';
         const isGlobalEnabled = sqsConfig.GLOBAL_ENABLED;
         const params = {
           MessageBody: JSON.stringify(message),

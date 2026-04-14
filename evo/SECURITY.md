@@ -2,7 +2,7 @@
 
 ## Supported Versions
 
-We actively support the following versions of Evolution API with security updates:
+We actively support the following versions of evo API with security updates:
 
 | Version | Supported          |
 | ------- | ------------------ |
@@ -13,7 +13,7 @@ We actively support the following versions of Evolution API with security update
 
 ## Reporting a Vulnerability
 
-We take security vulnerabilities seriously. If you discover a security vulnerability in Evolution API, please help us by reporting it responsibly.
+We take security vulnerabilities seriously. If you discover a security vulnerability in evo API, please help us by reporting it responsibly.
 
 ### 🔒 Private Disclosure Process
 
@@ -21,7 +21,7 @@ We take security vulnerabilities seriously. If you discover a security vulnerabi
 
 Instead, please report security vulnerabilities via email to:
 
-**📧 contato@evolution-api.com**
+**📧 contato@evo-api.com**
 
 ### 📋 What to Include
 
@@ -31,7 +31,7 @@ When reporting a vulnerability, please include:
 - **Impact**: What an attacker could achieve by exploiting this vulnerability
 - **Steps to Reproduce**: Detailed steps to reproduce the issue
 - **Proof of Concept**: If possible, include a minimal proof of concept
-- **Environment**: Version of Evolution API, OS, Node.js version, etc.
+- **Environment**: Version of evo API, OS, Node.js version, etc.
 - **Suggested Fix**: If you have ideas for how to fix the issue
 
 ### 🕐 Response Timeline
@@ -46,7 +46,7 @@ We will acknowledge receipt of your vulnerability report within **48 hours** and
 
 This security policy applies to:
 
-- Evolution API core application
+- evo API core application
 - Official Docker images
 - Documentation that could lead to security issues
 
@@ -62,7 +62,7 @@ The following are generally considered out of scope:
 
 ### 🏆 Recognition
 
-We believe in recognizing security researchers who help us keep Evolution API secure:
+We believe in recognizing security researchers who help us keep evo API secure:
 
 - We will acknowledge your contribution in our security advisories (unless you prefer to remain anonymous)
 - For significant vulnerabilities, we may feature you in our Hall of Fame
@@ -70,7 +70,7 @@ We believe in recognizing security researchers who help us keep Evolution API se
 
 ### 📚 Security Best Practices
 
-For users deploying Evolution API:
+For users deploying evo API:
 
 - Always use the latest supported version
 - Keep your dependencies up to date
@@ -92,8 +92,8 @@ Security updates will be:
 
 For any questions about this security policy, please contact:
 
-- **Email**: contato@evolution-api.com
+- **Email**: contato@evo-api.com
 
 ---
 
-Thank you for helping keep Evolution API and our community safe! 🛡️
+Thank you for helping keep evo API and our community safe! 🛡️

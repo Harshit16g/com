@@ -163,7 +163,7 @@ DROP TABLE `GenericBot`;
 DROP TABLE `GenericSetting`;
 
 -- CreateTable
-CREATE TABLE `EvolutionBot` (
+CREATE TABLE `evoBot` (
     `id` VARCHAR(191) NOT NULL,
     `enabled` BOOLEAN NOT NULL DEFAULT true,
     `description` VARCHAR(255) NULL,
@@ -189,7 +189,7 @@ CREATE TABLE `EvolutionBot` (
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 -- CreateTable
-CREATE TABLE `EvolutionBotSetting` (
+CREATE TABLE `evoBotSetting` (
     `id` VARCHAR(191) NOT NULL,
     `expire` INTEGER NULL DEFAULT 0,
     `keywordFinish` VARCHAR(100) NULL,
@@ -205,15 +205,15 @@ CREATE TABLE `EvolutionBotSetting` (
     `botIdFallback` VARCHAR(100) NULL,
     `instanceId` VARCHAR(191) NOT NULL,
 
-    UNIQUE INDEX `EvolutionBotSetting_instanceId_key`(`instanceId`),
+    UNIQUE INDEX `evoBotSetting_instanceId_key`(`instanceId`),
     PRIMARY KEY (`id`)
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 -- AddForeignKey
-ALTER TABLE `EvolutionBot` ADD CONSTRAINT `EvolutionBot_instanceId_fkey` FOREIGN KEY (`instanceId`) REFERENCES `Instance`(`id`) ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE `evoBot` ADD CONSTRAINT `evoBot_instanceId_fkey` FOREIGN KEY (`instanceId`) REFERENCES `Instance`(`id`) ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE `EvolutionBotSetting` ADD CONSTRAINT `EvolutionBotSetting_botIdFallback_fkey` FOREIGN KEY (`botIdFallback`) REFERENCES `EvolutionBot`(`id`) ON DELETE SET NULL ON UPDATE CASCADE;
+ALTER TABLE `evoBotSetting` ADD CONSTRAINT `evoBotSetting_botIdFallback_fkey` FOREIGN KEY (`botIdFallback`) REFERENCES `evoBot`(`id`) ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE `EvolutionBotSetting` ADD CONSTRAINT `EvolutionBotSetting_instanceId_fkey` FOREIGN KEY (`instanceId`) REFERENCES `Instance`(`id`) ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE `evoBotSetting` ADD CONSTRAINT `evoBotSetting_instanceId_fkey` FOREIGN KEY (`instanceId`) REFERENCES `Instance`(`id`) ON DELETE CASCADE ON UPDATE CASCADE;

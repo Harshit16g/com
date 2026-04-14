@@ -1,5 +1,5 @@
 # ─── wa_api stack: API + Workers + Postgres + Redis ──────────────
-# Evolution API runs separately (see docker-compose.evo.yml or standalone).
+# evo API runs separately (see docker-compose.evo.yml or standalone).
 # Scale workers: docker compose up --scale worker-core=4
 
 services:
@@ -17,7 +17,7 @@ services:
     networks:
       - wa_api_shared_net
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U wa_api -d wa_api"]
+      test: [ "CMD-SHELL", "pg_isready -U wa_api -d wa_api" ]
       interval: 5s
       timeout: 5s
       retries: 10
@@ -32,7 +32,7 @@ services:
     networks:
       - wa_api_shared_net
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: [ "CMD", "redis-cli", "ping" ]
       interval: 5s
       timeout: 3s
       retries: 10
@@ -51,8 +51,8 @@ services:
     environment:
       DATABASE_URL: postgresql://wa_api:${POSTGRES_PASSWORD:-wa_api_secret}@postgres:5432/wa_api
       REDIS_URL: redis://redis:6379
-      EVOLUTION_BASE_URL: ${EVOLUTION_BASE_URL}
-      EVOLUTION_API_KEY: ${EVOLUTION_API_KEY}
+      evo_BASE_URL: ${evo_BASE_URL}
+      evo_API_KEY: ${evo_API_KEY}
       SERVER_PORT: "8080"
       ADMIN_API_KEY: ${ADMIN_API_KEY}
       ALERT_WEBHOOK_URL: ${ALERT_WEBHOOK_URL:-}
@@ -75,8 +75,8 @@ services:
     environment:
       DATABASE_URL: postgresql://wa_api:${POSTGRES_PASSWORD:-wa_api_secret}@postgres:5432/wa_api
       REDIS_URL: redis://redis:6379
-      EVOLUTION_BASE_URL: ${EVOLUTION_BASE_URL}
-      EVOLUTION_API_KEY: ${EVOLUTION_API_KEY}
+      evo_BASE_URL: ${evo_BASE_URL}
+      evo_API_KEY: ${evo_API_KEY}
       WORKER_COUNT: "1"
       MIN_SEND_DELAY_SECS: ${MIN_SEND_DELAY_SECS:-8}
       MAX_SEND_DELAY_SECS: ${MAX_SEND_DELAY_SECS:-15}

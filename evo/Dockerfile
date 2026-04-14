@@ -5,9 +5,9 @@ RUN apk update && \
 
 LABEL version="2.3.1" description="Api to control whatsapp features through http requests." 
 LABEL maintainer="Davidson Gomes" git="https://github.com/DavidsonGomes"
-LABEL contact="contato@evolution-api.com"
+LABEL contact="contato@evo-api.com"
 
-WORKDIR /evolution
+WORKDIR /evo
 
 COPY ./package*.json ./
 COPY ./tsconfig.json ./
@@ -38,20 +38,20 @@ RUN apk update && \
 ENV TZ=America/Sao_Paulo
 ENV DOCKER_ENV=true
 
-WORKDIR /evolution
+WORKDIR /evo
 
-COPY --from=builder /evolution/package.json ./package.json
-COPY --from=builder /evolution/package-lock.json ./package-lock.json
+COPY --from=builder /evo/package.json ./package.json
+COPY --from=builder /evo/package-lock.json ./package-lock.json
 
-COPY --from=builder /evolution/node_modules ./node_modules
-COPY --from=builder /evolution/dist ./dist
-COPY --from=builder /evolution/prisma ./prisma
-COPY --from=builder /evolution/manager ./manager
-COPY --from=builder /evolution/public ./public
-COPY --from=builder /evolution/.env ./.env
-COPY --from=builder /evolution/Docker ./Docker
-COPY --from=builder /evolution/runWithProvider.js ./runWithProvider.js
-COPY --from=builder /evolution/tsup.config.ts ./tsup.config.ts
+COPY --from=builder /evo/node_modules ./node_modules
+COPY --from=builder /evo/dist ./dist
+COPY --from=builder /evo/prisma ./prisma
+COPY --from=builder /evo/manager ./manager
+COPY --from=builder /evo/public ./public
+COPY --from=builder /evo/.env ./.env
+COPY --from=builder /evo/Docker ./Docker
+COPY --from=builder /evo/runWithProvider.js ./runWithProvider.js
+COPY --from=builder /evo/tsup.config.ts ./tsup.config.ts
 
 ENV DOCKER_ENV=true
 

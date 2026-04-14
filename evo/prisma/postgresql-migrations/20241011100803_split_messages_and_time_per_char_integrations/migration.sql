@@ -7,11 +7,11 @@ ALTER TABLE "DifySetting" ADD COLUMN     "splitMessages" BOOLEAN DEFAULT false,
 ADD COLUMN     "timePerChar" INTEGER DEFAULT 50;
 
 -- AlterTable
-ALTER TABLE "EvolutionBot" ADD COLUMN     "splitMessages" BOOLEAN DEFAULT false,
+ALTER TABLE "evoBot" ADD COLUMN     "splitMessages" BOOLEAN DEFAULT false,
 ADD COLUMN     "timePerChar" INTEGER DEFAULT 50;
 
 -- AlterTable
-ALTER TABLE "EvolutionBotSetting" ADD COLUMN     "splitMessages" BOOLEAN DEFAULT false,
+ALTER TABLE "evoBotSetting" ADD COLUMN     "splitMessages" BOOLEAN DEFAULT false,
 ADD COLUMN     "timePerChar" INTEGER DEFAULT 50;
 
 -- AlterTable

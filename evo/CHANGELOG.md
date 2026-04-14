@@ -172,7 +172,7 @@
 * **Workflows**: Update checkout step to include submodules
   - Added 'submodules: recursive' option to checkout step in multiple workflow files to ensure submodules are properly initialized during CI/CD processes
 * **Manager**: Update asset files and install process
-  - Updated subproject reference in evolution-manager-v2 to the latest commit
+  - Updated subproject reference in evo-manager-v2 to the latest commit
   - Enhanced the manager_install.sh script to include npm install and build steps
   - Replaced old JavaScript asset file with a new version for improved performance
   - Added a new CSS file for consistent styling across the application
@@ -191,7 +191,7 @@
 * **Kafka Migration**: Fixed PostgreSQL migration error for Kafka integration
   - Corrected table reference from `"public"."Instance"` to `"Instance"` in foreign key constraint
   - Fixed `ERROR: relation "public.Instance" does not exist` issue in migration `20250918182355_add_kafka_integration`
-  - Aligned table naming convention with other Evolution API migrations for consistency
+  - Aligned table naming convention with other evo API migrations for consistency
   - Resolved database migration failure that prevented Kafka integration setup
 * **Update Baileys Version**: v7.0.0-rc.5 with compatibility fixes
   - Fixed assertSessions signature compatibility using type assertion
@@ -230,9 +230,9 @@
   - Consumer group management for reliable event processing
   - Integration with existing event manager for seamless event distribution
 
-* **Evolution Manager v2 Open Source**: Evolution Manager v2 is now available as open source
+* **evo Manager v2 Open Source**: evo Manager v2 is now available as open source
   - Added as git submodule with HTTPS URL for easy access
-  - Complete open source setup with Apache 2.0 license + Evolution API custom conditions
+  - Complete open source setup with Apache 2.0 license + evo API custom conditions
   - GitHub templates for issues, pull requests, and workflows
   - Comprehensive documentation and contribution guidelines
   - Docker support for development and production environments
@@ -240,7 +240,7 @@
   - Multi-language support (English, Portuguese, Spanish, French)
   - Modern React + TypeScript + Vite frontend with Tailwind CSS
 
-* **EvolutionBot Enhancements**: Improved EvolutionBot functionality and message handling
+* **evoBot Enhancements**: Improved evoBot functionality and message handling
   - Implemented splitMessages functionality for better message segmentation
   - Added linkPreview support for enhanced message presentation
   - Centralized split logic across chatbot services for consistency
@@ -264,7 +264,7 @@
   - Improved media URL handling and base64 encoding for better chatbot integration
   - Enhanced image message detection and processing workflow
 
-* **Evolution Manager v2 Linting**: Resolved ESLint configuration conflicts
+* **evo Manager v2 Linting**: Resolved ESLint configuration conflicts
   - Disabled conflicting Prettier rules in ESLint configuration
   - Added comprehensive rule overrides for TypeScript and React patterns
   - Fixed import ordering and code formatting issues
@@ -297,7 +297,7 @@
 
 * Add extra fields to object sent to Flowise bot
 * Add Prometheus-compatible /metrics endpoint (gated by PROMETHEUS_METRICS)
-* Implement linkPreview support for Evolution Bot
+* Implement linkPreview support for evo Bot
 
 ### Fixed
 
@@ -416,7 +416,7 @@
 * Correction of webhook global
 * Fixed send audio with whatsapp cloud api
 * Refactor on fetch chats
-* Refactor on Evolution Channel
+* Refactor on evo Channel
 
 # 2.2.0 (2024-10-18 10:00)
 
@@ -438,7 +438,7 @@
 * Mark as read from me and groups
 * Fetch chats query
 * Ads messages in chatwoot
-* Add indexes to improve performance in Evolution
+* Add indexes to improve performance in evo
 * Add logical or permanent message deletion based on env config
 * Add support for fetching multiple instances by key
 * Update instance.controller.ts to filter by instanceName
@@ -492,11 +492,11 @@
 * Validate if cache exists before accessing it
 * Missing autoCreate chatwoot in instance create
 * Fixed bugs in the frontend, on the event screens
-* Fixed use chatwoot with evolution channel
+* Fixed use chatwoot with evo channel
 * Fix chatwoot reply quote with Cloud API
 * Use exchange name from .env on RabbitMQ
 * Fixed chatwoot screen
-* It is now possible to send images via the Evolution Channel
+* It is now possible to send images via the evo Channel
 * Removed "version" from docker-compose as it is obsolete (https://dev.to/ajeetraina/do-we-still-use-version-in-compose-3inp)
 * Fixed typebot ignoreJids being used only from default settings
 * Fixed Chatwoot inbox creation on save
@@ -511,10 +511,10 @@
 
 * Improved layout manager
 * Translation in manager: English, Portuguese, Spanish and French
-* Evolution Bot Integration
+* evo Bot Integration
 * Option to disable chatwoot bot contact with CHATWOOT_BOT_CONTACT
 * Added flowise integration
-* Added evolution channel on instance create
+* Added evo channel on instance create
 * Change in license to Apache-2.0
 * Mark All in events
 
@@ -705,7 +705,7 @@
 * Reply with media message on Chatwoot
 * improvements in sending status and groups
 * Correction in response returns from buttons, lists and templates
-* EvolutionAPI/Baileys implemented
+* evoAPI/Baileys implemented
 
 ### Break changes
 
@@ -1000,7 +1000,7 @@
 
 * Chatwoot: v2.18.0 - v3.0.0
 * Typebot: v2.16.0
-* Manager Evolution API
+* Manager evo API
 
 # 1.4.8 (2023-07-27 10:27)
 

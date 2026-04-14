@@ -5,7 +5,7 @@ use tokio::time::sleep;
 use tracing::{error, info, warn};
 
 use shared::{
-    db::DbClient, evolution::EvolutionClient, redis_client::RedisClient, types::InstanceHealth,
+    db::DbClient, evo::evoClient, redis_client::RedisClient, types::InstanceHealth,
 };
 
 use shared::state::AppState;
@@ -13,18 +13,18 @@ use std::sync::Arc;
 
 pub async fn start(state: Arc<AppState>) -> Result<()> {
     let redis = &state.redis;
-    let evolution = &state.evolution;
+    let evo = &state.evo;
     let supabase = &state.db;
     let alert_url = state.config.alert_webhook_url.clone();
 
     info!("Health monitor started — checking every 5 minutes");
 
     loop {
-        if let Err(e) = check_all_instances(redis, evolution, supabase, &alert_url).await {
+        if let Err(e) = check_all_instances(redis, evo, supabase, &alert_url).await {
             error!("Health monitor error: {}", e);
         }
 
-        if let Err(e) = reconcile_stale_messages(redis, evolution, supabase).await {
+        if let Err(e) = reconcile_stale_messages(redis, evo, supabase).await {
             error!("Reconciliation error: {}", e);
         }
 
@@ -32,14 +32,14 @@ pub async fn start(state: Arc<AppState>) -> Result<()> {
     }
 }
 
-/// Check all instances registered in Evolution API.
+/// Check all instances registered in evo API.
 async fn check_all_instances(
     redis: &RedisClient,
-    evolution: &EvolutionClient,
+    evo: &evoClient,
     supabase: &DbClient,
     alert_url: &Option<String>,
 ) -> Result<()> {
-    let instances = evolution.fetch_instances().await.unwrap_or_default();
+    let instances = evo.fetch_instances().await.unwrap_or_default();
 
     for instance in &instances {
         let name = instance
@@ -52,7 +52,7 @@ async fn check_all_instances(
             continue;
         }
 
-        let state_str = evolution
+        let state_str = evo
             .get_instance_status(name)
             .await
             .unwrap_or_else(|_| "DISCONNECTED".to_string());
@@ -110,16 +110,16 @@ async fn check_all_instances(
     Ok(())
 }
 
-/// Reconciliation: poll Evolution for status of messages in-flight > 10 minutes.
+/// Reconciliation: poll evo for status of messages in-flight > 10 minutes.
 /// Runs every 5 minutes as per spec.
 async fn reconcile_stale_messages(
     _redis: &RedisClient,
-    _evolution: &EvolutionClient,
+    _evo: &evoClient,
     _supabase: &DbClient,
 ) -> Result<()> {
     // In a full implementation:
     // 1. Query Supabase for wa_interaction_log where status=sent AND sent_at < now - 10min
-    // 2. For each: call Evolution API to check actual delivery status
+    // 2. For each: call evo API to check actual delivery status
     // 3. Update Supabase with current status
     // This is a reconciliation safety net for lost webhooks.
     info!("Reconciliation tick — checking stale in-flight messages");

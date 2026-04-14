@@ -1,5 +1,5 @@
 {
-  "name": "evolution-api",
+  "name": "evo-api",
   "version": "2.3.7",
   "description": "Rest api for communication with WhatsApp",
   "main": "./dist/main.js",
@@ -24,7 +24,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/EvolutionAPI/evolution-api.git"
+    "url": "git+https://github.com/evoAPI/evo-api.git"
   },
   "keywords": [
     "chat",
@@ -44,13 +44,13 @@
   ],
   "author": {
     "name": "Davidson Gomes",
-    "email": "contato@evolution-api.com"
+    "email": "contato@evo-api.com"
   },
   "license": "Apache-2.0",
   "bugs": {
-    "url": "https://github.com/EvolutionAPI/evolution-api/issues"
+    "url": "https://github.com/evoAPI/evo-api/issues"
   },
-  "homepage": "https://github.com/EvolutionAPI/evolution-api#readme",
+  "homepage": "https://github.com/evoAPI/evo-api#readme",
   "lint-staged": {
     "src/**/*.{ts,js}": [
       "eslint --fix"

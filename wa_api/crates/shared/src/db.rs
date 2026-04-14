@@ -53,7 +53,7 @@ pub struct InteractionLogInsert {
     pub recipient_name: Option<String>,
     pub instance_used: String,
     pub status: String,
-    pub evolution_msg_id: Option<String>,
+    pub evo_msg_id: Option<String>,
     pub error_reason: Option<String>,
     pub retry_count: i16,
     pub scheduled_at: chrono::DateTime<chrono::Utc>,
@@ -193,7 +193,7 @@ impl DbClient {
         sqlx::query(
             "INSERT INTO wa_interaction_log \
              (tenant_id, campaign_id, message_type, recipient_phone_hash, recipient_phone, \
-              recipient_name, instance_used, status, evolution_msg_id, error_reason, \
+              recipient_name, instance_used, status, evo_msg_id, error_reason, \
               retry_count, scheduled_at, sent_at, idempotency_key) \
              VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)",
         )
@@ -205,7 +205,7 @@ impl DbClient {
         .bind(&log.recipient_name)
         .bind(&log.instance_used)
         .bind(&log.status)
-        .bind(&log.evolution_msg_id)
+        .bind(&log.evo_msg_id)
         .bind(&log.error_reason)
         .bind(log.retry_count)
         .bind(log.scheduled_at)
@@ -218,17 +218,17 @@ impl DbClient {
 
     pub async fn update_interaction_status(
         &self,
-        evolution_msg_id: &str,
+        evo_msg_id: &str,
         status: &str,
         delivered_at: Option<chrono::DateTime<chrono::Utc>>,
     ) -> Result<()> {
         sqlx::query(
             "UPDATE wa_interaction_log SET status = $1, delivered_at = $2 \
-             WHERE evolution_msg_id = $3",
+             WHERE evo_msg_id = $3",
         )
         .bind(status)
         .bind(delivered_at)
-        .bind(evolution_msg_id)
+        .bind(evo_msg_id)
         .execute(&self.pool)
         .await?;
         Ok(())

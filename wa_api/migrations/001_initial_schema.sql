@@ -24,7 +24,7 @@ CREATE TABLE IF NOT EXISTS tenants (
     id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     agency_id         UUID NOT NULL REFERENCES agencies(id),
     partner_id        UUID,                     -- links to Leaex partners table
-    instance_name     TEXT UNIQUE NOT NULL,     -- Evolution API instance identifier
+    instance_name     TEXT UNIQUE NOT NULL,     -- evo API instance identifier
     wa_number         TEXT,                     -- +91XXXXXXXXXX
     instance_status   TEXT NOT NULL DEFAULT 'disconnected'
                           CHECK (instance_status IN
@@ -76,7 +76,7 @@ CREATE TABLE IF NOT EXISTS wa_interaction_log (
                                 CHECK (status IN
                                   ('pending','sent','delivered','read','failed',
                                    'deferred_spam','blocked_optout','duplicate','expired_dlq')),
-    evolution_msg_id        TEXT,
+    evo_msg_id        TEXT,
     error_reason            TEXT,
     retry_count             SMALLINT NOT NULL DEFAULT 0,
     scheduled_at            TIMESTAMPTZ NOT NULL,

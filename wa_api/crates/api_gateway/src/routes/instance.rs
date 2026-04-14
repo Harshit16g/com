@@ -16,7 +16,7 @@ async fn instance_qr(
     State(state): State<Arc<AppState>>,
     Extension(ctx): Extension<TenantContext>,
 ) -> impl IntoResponse {
-    match state.evolution.get_instance_qr(&ctx.instance_name).await {
+    match state.evo.get_instance_qr(&ctx.instance_name).await {
         Ok((base64, code)) => (
             StatusCode::OK,
             Json(json!({ "base64": base64, "code": code })),
@@ -64,10 +64,10 @@ async fn instance_health(
         }
     };
 
-    // If ACTIVE from cache, also verify with Evolution API
-    let evolution_state = if health == shared::types::InstanceHealth::Active {
+    // If ACTIVE from cache, also verify with evo API
+    let evo_state = if health == shared::types::InstanceHealth::Active {
         match state
-            .evolution
+            .evo
             .get_instance_status(&ctx.instance_name)
             .await
         {
@@ -83,7 +83,7 @@ async fn instance_health(
         Json(json!({
             "instance_name": ctx.instance_name,
             "wa_number": ctx.wa_number,
-            "status": evolution_state,
+            "status": evo_state,
             "cached_status": health.as_str(),
         })),
     )

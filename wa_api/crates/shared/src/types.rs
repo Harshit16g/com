@@ -21,7 +21,7 @@ pub struct TenantContext {
     pub agency_id: Uuid,
     pub tenant_id: Uuid,
     pub partner_id: Uuid,
-    /// Evolution API instance identifier (e.g. "wa_glamour_studio_01")
+    /// evo API instance identifier (e.g. "wa_glamour_studio_01")
     pub instance_name: String,
     /// +91XXXXXXXXXX of the connected WhatsApp number
     pub wa_number: String,
@@ -84,7 +84,7 @@ pub enum MessagePayload {
     Template {
         template_name: String,
         variables: Vec<String>,
-        body: String, // rendered body for Evolution API
+        body: String, // rendered body for evo API
     },
 }
 
@@ -130,7 +130,7 @@ pub struct WhatsAppJob {
     pub partner_id: Uuid,
     /// None for CRM direct messages
     pub campaign_id: Option<Uuid>,
-    /// Which Evolution API instance to use
+    /// Which evo API instance to use
     pub instance_name: String,
     pub message_type: MessageType,
     /// +91XXXXXXXXXX

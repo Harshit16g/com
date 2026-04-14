@@ -21,7 +21,7 @@ DROP TABLE "GenericBot";
 DROP TABLE "GenericSetting";
 
 -- CreateTable
-CREATE TABLE "EvolutionBot" (
+CREATE TABLE "evoBot" (
     "id" TEXT NOT NULL,
     "enabled" BOOLEAN NOT NULL DEFAULT true,
     "description" VARCHAR(255),
@@ -43,11 +43,11 @@ CREATE TABLE "EvolutionBot" (
     "updatedAt" TIMESTAMP NOT NULL,
     "instanceId" TEXT NOT NULL,
 
-    CONSTRAINT "EvolutionBot_pkey" PRIMARY KEY ("id")
+    CONSTRAINT "evoBot_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
-CREATE TABLE "EvolutionBotSetting" (
+CREATE TABLE "evoBotSetting" (
     "id" TEXT NOT NULL,
     "expire" INTEGER DEFAULT 0,
     "keywordFinish" VARCHAR(100),
@@ -63,17 +63,17 @@ CREATE TABLE "EvolutionBotSetting" (
     "botIdFallback" VARCHAR(100),
     "instanceId" TEXT NOT NULL,
 
-    CONSTRAINT "EvolutionBotSetting_pkey" PRIMARY KEY ("id")
+    CONSTRAINT "evoBotSetting_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateIndex
-CREATE UNIQUE INDEX "EvolutionBotSetting_instanceId_key" ON "EvolutionBotSetting"("instanceId");
+CREATE UNIQUE INDEX "evoBotSetting_instanceId_key" ON "evoBotSetting"("instanceId");
 
 -- AddForeignKey
-ALTER TABLE "EvolutionBot" ADD CONSTRAINT "EvolutionBot_instanceId_fkey" FOREIGN KEY ("instanceId") REFERENCES "Instance"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "evoBot" ADD CONSTRAINT "evoBot_instanceId_fkey" FOREIGN KEY ("instanceId") REFERENCES "Instance"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "EvolutionBotSetting" ADD CONSTRAINT "EvolutionBotSetting_botIdFallback_fkey" FOREIGN KEY ("botIdFallback") REFERENCES "EvolutionBot"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+ALTER TABLE "evoBotSetting" ADD CONSTRAINT "evoBotSetting_botIdFallback_fkey" FOREIGN KEY ("botIdFallback") REFERENCES "evoBot"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "EvolutionBotSetting" ADD CONSTRAINT "EvolutionBotSetting_instanceId_fkey" FOREIGN KEY ("instanceId") REFERENCES "Instance"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "evoBotSetting" ADD CONSTRAINT "evoBotSetting_instanceId_fkey" FOREIGN KEY ("instanceId") REFERENCES "Instance"("id") ON DELETE CASCADE ON UPDATE CASCADE;

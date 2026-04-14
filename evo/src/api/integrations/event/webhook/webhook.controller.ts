@@ -289,7 +289,7 @@ export class WebhookController extends EventController implements EventControlle
       const payload = {
         iat: Math.floor(Date.now() / 1000),
         exp: Math.floor(Date.now() / 1000) + 600, // 10 min expiration
-        app: 'evolution',
+        app: 'evo',
         action: 'webhook',
       };
 

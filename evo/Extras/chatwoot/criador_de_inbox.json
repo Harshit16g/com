@@ -4,7 +4,7 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "={{ $json.evolution_url }}/instance/create",
+        "url": "={{ $json.evo_url }}/instance/create",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
@@ -147,7 +147,7 @@
     },
     {
       "parameters": {
-        "content": "## Workflow Para Criar Inbox - Evolution 2.0 ou superior\n**Aqui você configura a comunicação entre o chatwoot e a Evolution API para criar novas instâncias a partir do chatwoot**\n**Instruções**\n**No node Info Base, configure as variáveis de seu Chatwoot e Evolution API**",
+        "content": "## Workflow Para Criar Inbox - evo 2.0 ou superior\n**Aqui você configura a comunicação entre o chatwoot e a evo API para criar novas instâncias a partir do chatwoot**\n**Instruções**\n**No node Info Base, configure as variáveis de seu Chatwoot e evo API**",
         "width": 1129.7777777777778
       },
       "id": "7c66af51-b01e-4b76-8a8c-0193e87ec9d5",
@@ -169,8 +169,8 @@
               "value": "https://chatwootUrl - preencha"
             },
             {
-              "name": "evolution_url",
-              "value": "https://evolution_url - preencha"
+              "name": "evo_url",
+              "value": "https://evo_url - preencha"
             },
             {
               "name": "global_api_key",
@@ -416,7 +416,7 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\n\"channel\": {\n\"webhook_url\": \"{{ $('Info Base').item.json[\"evolution_url\"] }}/chatwoot/webhook/{{ encodeURIComponent($('Info Base').item.json[\"instanceName\"]) }}\"\n}\n}",
+        "jsonBody": "={\n\"channel\": {\n\"webhook_url\": \"{{ $('Info Base').item.json[\"evo_url\"] }}/chatwoot/webhook/{{ encodeURIComponent($('Info Base').item.json[\"instanceName\"]) }}\"\n}\n}",
         "options": {}
       },
       "id": "74d6db21-d49e-48d6-b1a8-ff8bddca67d1",

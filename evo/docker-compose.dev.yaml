@@ -1,35 +1,35 @@
 services:
   api:
-    container_name: evolution_api
-    image: evolution/api:local
+    container_name: evo_api
+    image: evo/api:local
     build: .
     restart: always
     ports:
       - 8080:8080
     volumes:
-      - evolution_instances:/evolution/instances
+      - evo_instances:/evo/instances
     networks:
-      - evolution-net
+      - evo-net
     env_file:
       - .env
     expose:
       - 8080
 
   frontend:
-    container_name: evolution_frontend
-    image: evolution/manager:local
-    build: ./evolution-manager-v2
+    container_name: evo_frontend
+    image: evo/manager:local
+    build: ./evo-manager-v2
     restart: always
     ports:
       - "3000:80"
     networks:
-      - evolution-net
+      - evo-net
 
 volumes:
-  evolution_instances:
+  evo_instances:
 
 
 networks:
-  evolution-net:
-    name: evolution-net
+  evo-net:
+    name: evo-net
     driver: bridge

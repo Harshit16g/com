@@ -1,7 +1,7 @@
 use tracing::info;
 
 use crate::{
-    config::AppConfig, db::DbClient, evolution::EvolutionClient, redis_client::RedisClient,
+    config::AppConfig, db::DbClient, evo::evoClient, redis_client::RedisClient,
 };
 
 #[derive(Clone)]
@@ -9,7 +9,7 @@ pub struct AppState {
     pub db: DbClient,       // Internally wraps PgPool
     pub redis: RedisClient, // Internally wraps fred::RedisPool
     pub config: AppConfig,
-    pub evolution: EvolutionClient,
+    pub evo: evoClient,
 }
 
 pub async fn init() -> AppState {
@@ -24,7 +24,7 @@ pub async fn init() -> AppState {
         .await
         .expect("Failed to connect to PG pool");
 
-    let evolution = EvolutionClient::new(&config.evolution_base_url, &config.evolution_api_key);
+    let evo = evoClient::new(&config.evo_base_url, &config.evo_api_key);
 
     info!("Shared state initialized successfully.");
 
@@ -32,6 +32,6 @@ pub async fn init() -> AppState {
         config,
         redis,
         db,
-        evolution,
+        evo,
     }
 }

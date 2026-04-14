@@ -1,35 +1,35 @@
-<h1 align="center">Evolution Api</h1>
+<h1 align="center">evo Api</h1>
 
 <div align="center">
 
-[![Docker Image](https://img.shields.io/badge/Docker-image-blue)](https://hub.docker.com/r/evoapicloud/evolution-api)
-[![Whatsapp Group](https://img.shields.io/badge/Group-WhatsApp-%2322BC18)](https://evolution-api.com/whatsapp)
-[![Discord Community](https://img.shields.io/badge/Discord-Community-blue)](https://evolution-api.com/discord)
-[![Postman Collection](https://img.shields.io/badge/Postman-Collection-orange)](https://evolution-api.com/postman) 
-[![Documentation](https://img.shields.io/badge/Documentation-Official-green)](https://doc.evolution-api.com)
-[![Feature Requests](https://img.shields.io/badge/Feature-Requests-purple)](https://evolutionapi.canny.io/feature-requests)
-[![Roadmap](https://img.shields.io/badge/Roadmap-Community-blue)](https://evolutionapi.canny.io/feature-requests)
-[![Changelog](https://img.shields.io/badge/Changelog-Updates-green)](https://evolutionapi.canny.io/changelog)
+[![Docker Image](https://img.shields.io/badge/Docker-image-blue)](https://hub.docker.com/r/evoapicloud/evo-api)
+[![Whatsapp Group](https://img.shields.io/badge/Group-WhatsApp-%2322BC18)](https://evo-api.com/whatsapp)
+[![Discord Community](https://img.shields.io/badge/Discord-Community-blue)](https://evo-api.com/discord)
+[![Postman Collection](https://img.shields.io/badge/Postman-Collection-orange)](https://evo-api.com/postman) 
+[![Documentation](https://img.shields.io/badge/Documentation-Official-green)](https://doc.evo-api.com)
+[![Feature Requests](https://img.shields.io/badge/Feature-Requests-purple)](https://evoapi.canny.io/feature-requests)
+[![Roadmap](https://img.shields.io/badge/Roadmap-Community-blue)](https://evoapi.canny.io/feature-requests)
+[![Changelog](https://img.shields.io/badge/Changelog-Updates-green)](https://evoapi.canny.io/changelog)
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue)](./LICENSE)
 [![Support](https://img.shields.io/badge/Donation-picpay-green)](https://app.picpay.com/user/davidsongomes1998)
-[![Sponsors](https://img.shields.io/badge/Github-sponsor-orange)](https://github.com/sponsors/EvolutionAPI)
+[![Sponsors](https://img.shields.io/badge/Github-sponsor-orange)](https://github.com/sponsors/evoAPI)
 
 </div>
   
 <div align="center"><img src="./public/images/cover.png"></div>
 
-## Evolution API
+## evo API
 
-Evolution API began as a WhatsApp controller API based on [CodeChat](https://github.com/code-chat-br/whatsapp-api), which in turn implemented the [Baileys](https://github.com/WhiskeySockets/Baileys) library. While originally focused on WhatsApp, Evolution API has grown into a comprehensive platform supporting multiple messaging services and integrations. We continue to acknowledge CodeChat for laying the groundwork.
+evo API began as a WhatsApp controller API based on [CodeChat](https://github.com/code-chat-br/whatsapp-api), which in turn implemented the [Baileys](https://github.com/WhiskeySockets/Baileys) library. While originally focused on WhatsApp, evo API has grown into a comprehensive platform supporting multiple messaging services and integrations. We continue to acknowledge CodeChat for laying the groundwork.
 
-Today, Evolution API is not limited to WhatsApp. It integrates with various platforms such as Typebot, Chatwoot, Dify, and OpenAI, offering a broad array of functionalities beyond messaging. Evolution API supports both the Baileys-based WhatsApp API and the official WhatsApp Business API, with upcoming support for Instagram and Messenger.
+Today, evo API is not limited to WhatsApp. It integrates with various platforms such as Typebot, Chatwoot, Dify, and OpenAI, offering a broad array of functionalities beyond messaging. evo API supports both the Baileys-based WhatsApp API and the official WhatsApp Business API, with upcoming support for Instagram and Messenger.
 
 ## Looking for a Lightweight Version?
-For those who need a more streamlined and performance-optimized version, check out [Evolution API Lite](https://github.com/EvolutionAPI/evolution-api-lite). It's designed specifically for microservices, focusing solely on connectivity without integrations or audio conversion features. Ideal for environments that prioritize simplicity and efficiency.
+For those who need a more streamlined and performance-optimized version, check out [evo API Lite](https://github.com/evoAPI/evo-api-lite). It's designed specifically for microservices, focusing solely on connectivity without integrations or audio conversion features. Ideal for environments that prioritize simplicity and efficiency.
 
 ## Types of Connections
 
-Evolution API supports multiple types of connections to WhatsApp, enabling flexible and powerful integration options:
+evo API supports multiple types of connections to WhatsApp, enabling flexible and powerful integration options:
 
 - *WhatsApp API - Baileys*:
   - A free API based on WhatsApp Web, leveraging the [Baileys library](https://github.com/WhiskeySockets/Baileys).
@@ -44,72 +44,72 @@ Evolution API supports multiple types of connections to WhatsApp, enabling flexi
 
 ## Integrations
 
-Evolution API supports various integrations to enhance its functionality. Below is a list of available integrations and their uses:
+evo API supports various integrations to enhance its functionality. Below is a list of available integrations and their uses:
 
 - [Typebot](https://typebot.io/):
-  - Build conversational bots using Typebot, integrated directly into Evolution with trigger management.
+  - Build conversational bots using Typebot, integrated directly into evo with trigger management.
 
 - [Chatwoot](https://www.chatwoot.com/):
   - Direct integration with Chatwoot for handling customer service for your business.
 
 - [RabbitMQ](https://www.rabbitmq.com/):
-  - Receive events from the Evolution API via RabbitMQ.
+  - Receive events from the evo API via RabbitMQ.
 
 - [Apache Kafka](https://kafka.apache.org/):
-  - Receive events from the Evolution API via Apache Kafka for real-time event streaming and processing.
+  - Receive events from the evo API via Apache Kafka for real-time event streaming and processing.
 
 - [Amazon SQS](https://aws.amazon.com/pt/sqs/):
-  - Receive events from the Evolution API via Amazon SQS.
+  - Receive events from the evo API via Amazon SQS.
 
 - [Socket.io](https://socket.io/):
-  - Receive events from the Evolution API via WebSocket.
+  - Receive events from the evo API via WebSocket.
 
 - [Dify](https://dify.ai/):
-  - Integrate your Evolution API directly with Dify AI for seamless trigger management and multiple agents.
+  - Integrate your evo API directly with Dify AI for seamless trigger management and multiple agents.
 
 - [OpenAI](https://openai.com/):
-  - Integrate your Evolution API with OpenAI for AI capabilities, including audio-to-text conversion, available across all Evolution integrations.
+  - Integrate your evo API with OpenAI for AI capabilities, including audio-to-text conversion, available across all evo integrations.
 
 - Amazon S3 / Minio:
   - Store media files received in [Amazon S3](https://aws.amazon.com/pt/s3/) or [Minio](https://min.io/).
 
 ## Community & Feedback
 
-We value community input and feedback to continuously improve Evolution API:
+We value community input and feedback to continuously improve evo API:
 
 ### 🚀 Feature Requests & Roadmap
-- **[Feature Requests](https://evolutionapi.canny.io/feature-requests)**: Submit new feature ideas and vote on community proposals
-- **[Roadmap](https://evolutionapi.canny.io/feature-requests)**: View planned features and development progress
-- **[Changelog](https://evolutionapi.canny.io/changelog)**: Stay updated with the latest releases and improvements
+- **[Feature Requests](https://evoapi.canny.io/feature-requests)**: Submit new feature ideas and vote on community proposals
+- **[Roadmap](https://evoapi.canny.io/feature-requests)**: View planned features and development progress
+- **[Changelog](https://evoapi.canny.io/changelog)**: Stay updated with the latest releases and improvements
 
 ### 💬 Community Support
-- **[WhatsApp Group](https://evolution-api.com/whatsapp)**: Join our community for support and discussions
-- **[Discord Community](https://evolution-api.com/discord)**: Real-time chat with developers and users
-- **[GitHub Issues](https://github.com/EvolutionAPI/evolution-api/issues)**: Report bugs and technical issues
+- **[WhatsApp Group](https://evo-api.com/whatsapp)**: Join our community for support and discussions
+- **[Discord Community](https://evo-api.com/discord)**: Real-time chat with developers and users
+- **[GitHub Issues](https://github.com/evoAPI/evo-api/issues)**: Report bugs and technical issues
 
 ### 🔒 Security
 - **[Security Policy](./SECURITY.md)**: Guidelines for reporting security vulnerabilities
-- **Security Contact**: contato@evolution-api.com
+- **Security Contact**: contato@evo-api.com
 
 ## Telemetry Notice
 
 To continuously improve our services, we have implemented telemetry that collects data on the routes used, the most accessed routes, and the version of the API in use. We would like to assure you that no sensitive or personal data is collected during this process. The telemetry helps us identify improvements and provide a better experience for users.
 
-## Evolution Support Premium
+## evo Support Premium
 
-Join our Evolution Pro community for expert support and a weekly call to answer questions. Visit the link below to learn more and subscribe:
+Join our evo Pro community for expert support and a weekly call to answer questions. Visit the link below to learn more and subscribe:
 
-[Click here to learn more](https://evolution-api.com/suporte-pro)
+[Click here to learn more](https://evo-api.com/suporte-pro)
 
 # Donate to the project.
 
 #### Github Sponsors
 
-https://github.com/sponsors/EvolutionAPI
+https://github.com/sponsors/evoAPI
 
 # Content Creator Partners
 
-We are proud to collaborate with the following content creators who have contributed valuable insights and tutorials about Evolution API:
+We are proud to collaborate with the following content creators who have contributed valuable insights and tutorials about evo API:
 
 - [Promovaweb](https://www.youtube.com/@promovaweb)
 - [Sandeco](https://www.youtube.com/@canalsandeco)
@@ -131,14 +131,14 @@ We are proud to collaborate with the following content creators who have contrib
 
 ## License
 
-Evolution API is licensed under the Apache License 2.0, with the following additional conditions:
+evo API is licensed under the Apache License 2.0, with the following additional conditions:
 
-1. **LOGO and copyright information**: In the process of using Evolution API's frontend components, you may not remove or modify the LOGO or copyright information in the Evolution API console or applications. This restriction is inapplicable to uses of Evolution API that do not involve its frontend components.
+1. **LOGO and copyright information**: In the process of using evo API's frontend components, you may not remove or modify the LOGO or copyright information in the evo API console or applications. This restriction is inapplicable to uses of evo API that do not involve its frontend components.
 
-2. **Usage Notification Requirement**: If Evolution API is used as part of any project, including closed-source systems (e.g., proprietary software), the user is required to display a clear notification within the system that Evolution API is being utilized. This notification should be visible to system administrators and accessible from the system's documentation or settings page. Failure to comply with this requirement may result in the necessity for a commercial license, as determined by the producer.
+2. **Usage Notification Requirement**: If evo API is used as part of any project, including closed-source systems (e.g., proprietary software), the user is required to display a clear notification within the system that evo API is being utilized. This notification should be visible to system administrators and accessible from the system's documentation or settings page. Failure to comply with this requirement may result in the necessity for a commercial license, as determined by the producer.
 
-Please contact contato@evolution-api.com to inquire about licensing matters.
+Please contact contato@evo-api.com to inquire about licensing matters.
 
 Apart from the specific conditions mentioned above, all other rights and restrictions follow the Apache License 2.0. Detailed information about the Apache License 2.0 can be found at [http://www.apache.org/licenses/LICENSE-2.0](http://www.apache.org/licenses/LICENSE-2.0).
 
-© 2025 Evolution API
+© 2025 evo API
