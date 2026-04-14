@@ -23,8 +23,13 @@ pub async fn start(state: Arc<AppState>) -> Result<()> {
         // Ping evo every minute
         if last_ping.elapsed() >= Duration::from_secs(60) {
             match evo.fetch_instances().await {
-                Ok(_) => info!("\x1b[1;32mACK SUCCESS\x1b[0m — Connection to Evolution API is stable"),
-                Err(e) => error!("\x1b[31mACK FAIL\x1b[0m — Connection to Evolution API lost: {}", e),
+                Ok(_) => {
+                    info!("\x1b[1;32mACK SUCCESS\x1b[0m — Connection to Evolution API is stable")
+                }
+                Err(e) => error!(
+                    "\x1b[31mACK FAIL\x1b[0m — Connection to Evolution API lost: {}",
+                    e
+                ),
             }
             last_ping = std::time::Instant::now();
         }

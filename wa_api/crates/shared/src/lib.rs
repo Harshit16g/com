@@ -1,5 +1,6 @@
 pub mod config;
 pub mod db;
+#[path = "evolution.rs"]
 pub mod evo;
 pub mod redis_client;
 pub mod state;
