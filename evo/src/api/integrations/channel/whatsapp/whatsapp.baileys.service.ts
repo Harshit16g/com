@@ -426,14 +426,7 @@ export class BaileysStartupService extends ChannelStartupService {
     if (connection === 'close') {
       const statusCode = (lastDisconnect?.error as Boom)?.output?.statusCode;
       const codesToNotReconnect = [DisconnectReason.loggedOut, DisconnectReason.forbidden, 402, 406];
-
-      // Prevent infinite reconnection loop during initial QR code generation.
-      // When the instance is not yet authenticated and no QR code has been generated,
-      // the first connection close is expected — allow it to proceed so the QR code
-      // can be generated and sent to the client.
-      const isInitialConnection = !this.instance.wuid && this.instance.qrcode?.count === 0;
-
-      const shouldReconnect = !codesToNotReconnect.includes(statusCode) && !isInitialConnection;
+      const shouldReconnect = !codesToNotReconnect.includes(statusCode);
       if (shouldReconnect) {
         await this.connectToWhatsapp(this.phoneNumber);
       } else {

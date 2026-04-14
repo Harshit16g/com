@@ -24,15 +24,6 @@ export class InstanceRouter extends RouterBroker {
 
         return res.status(HttpStatus.CREATED).json(response);
       })
-      .get('/create', (req, res) => {
-        return res.status(405).json({
-          status: 405,
-          error: 'Method Not Allowed',
-          response: {
-            message: ['Use POST instead of GET for instance creation'],
-          },
-        });
-      })
       .post(this.routerPath('restart'), ...guards, async (req, res) => {
         const response = await this.dataValidate<InstanceDto>({
           request: req,

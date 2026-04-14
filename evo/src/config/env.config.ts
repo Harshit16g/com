@@ -449,7 +449,7 @@ export class ConfigService {
     this.env.PRODUCTION = process.env?.NODE_ENV === 'PROD';
     if (process.env?.DOCKER_ENV === 'true') {
       this.env.SERVER.TYPE = process.env.SERVER_TYPE as 'http' | 'http';
-      this.env.SERVER.PORT = Number.parseInt(process.env.PORT || process.env.SERVER_PORT) || 8080;
+      this.env.SERVER.PORT = Number.parseInt(process.env.SERVER_PORT) || 8080;
     }
   }
 
@@ -458,7 +458,7 @@ export class ConfigService {
       SERVER: {
         NAME: process.env?.SERVER_NAME || 'evolution',
         TYPE: (process.env.SERVER_TYPE as 'http' | 'https') || 'http',
-        PORT: Number.parseInt(process.env.PORT || process.env.SERVER_PORT) || 8080,
+        PORT: Number.parseInt(process.env.SERVER_PORT) || 8080,
         URL: process.env.SERVER_URL,
         DISABLE_DOCS: process.env?.SERVER_DISABLE_DOCS === 'true',
         DISABLE_MANAGER: process.env?.SERVER_DISABLE_MANAGER === 'true',
@@ -482,7 +482,7 @@ export class ConfigService {
       },
       DATABASE: {
         CONNECTION: {
-          URI: process.env.DATABASE_CONNECTION_URI || process.env.DATABASE_URL || '',
+          URI: process.env.DATABASE_CONNECTION_URI || '',
           CLIENT_NAME: process.env.DATABASE_CONNECTION_CLIENT_NAME || 'evolution',
         },
         PROVIDER: process.env.DATABASE_PROVIDER || 'postgresql',

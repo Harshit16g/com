@@ -54,7 +54,7 @@ jobs:
             dockerfile: wa_api/Dockerfile.worker-core
             context: wa_api
           - service: evo_api
-            dockerfile: evo/Dockerfile.evo
+            dockerfile: evo/Dockerfile
             context: evo
 
     steps:
