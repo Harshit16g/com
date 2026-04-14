@@ -2,7 +2,7 @@ use chrono::Utc;
 use serde_json::json;
 use shared::{
     db::{DbClient, InteractionLogInsert},
-    evo::evoError,
+    evo::EvoError,
     redis_client::RedisClient,
     types::{InstanceHealth, JobStatus, MessagePayload, WhatsAppJob},
     utils::{hash_phone, now_unix_i64},
@@ -192,9 +192,9 @@ async fn process_job(worker_id: usize, job: WhatsAppJob, state: Arc<AppState>) {
             persist_status(&state.db, &job, JobStatus::Sent, Some(msg_id), None).await;
         }
 
-        Err(e @ (evoError::Transient(_) | evoError::RateLimit { .. })) => {
+        Err(e @ (EvoError::Transient(_) | EvoError::RateLimit { .. })) => {
             let retry_after = match &e {
-                evoError::RateLimit { retry_after_secs } => *retry_after_secs,
+                EvoError::RateLimit { retry_after_secs } => *retry_after_secs,
                 _ => RETRY_DELAYS
                     .get(job.retry_count as usize)
                     .copied()
@@ -210,7 +210,7 @@ async fn process_job(worker_id: usize, job: WhatsAppJob, state: Arc<AppState>) {
             }
         }
 
-        Err(evoError::InstanceDisconnected(_msg)) => {
+        Err(EvoError::InstanceDisconnected(_msg)) => {
             warn!(instance = %instance, "Instance disconnected — pausing jobs");
             let _ = redis
                 .set_instance_health(instance, &InstanceHealth::Disconnected)
@@ -218,7 +218,7 @@ async fn process_job(worker_id: usize, job: WhatsAppJob, state: Arc<AppState>) {
             requeue_with_delay(&redis, &job, 300).await;
         }
 
-        Err(evoError::AuthRequired(_msg)) => {
+        Err(EvoError::AuthRequired(_msg)) => {
             warn!(instance = %instance, "Auth required — moving to DLQ");
             let _ = redis
                 .set_instance_health(instance, &InstanceHealth::QrRequired)
@@ -226,7 +226,7 @@ async fn process_job(worker_id: usize, job: WhatsAppJob, state: Arc<AppState>) {
             move_to_dlq(&redis, &job, "instance_needs_auth").await;
         }
 
-        Err(evoError::InvalidRecipient(msg)) => {
+        Err(EvoError::InvalidRecipient(msg)) => {
             warn!(job_id = %job_id, "Invalid recipient — permanent failure");
             persist_status(
                 &state.db,
@@ -238,7 +238,7 @@ async fn process_job(worker_id: usize, job: WhatsAppJob, state: Arc<AppState>) {
             .await;
         }
 
-        Err(evoError::Banned(msg)) => {
+        Err(EvoError::Banned(msg)) => {
             error!(instance = %instance, "INSTANCE BANNED — escalating");
             let _ = redis
                 .set_instance_health(instance, &InstanceHealth::Banned)

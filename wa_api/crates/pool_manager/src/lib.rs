@@ -5,7 +5,7 @@ use tokio::time::sleep;
 use tracing::{error, info, warn};
 
 use shared::{
-    evo::evoClient,
+    evo::EvoClient,
     redis_client::RedisClient,
     types::{InstanceHealth, PoolNumberState},
 };
@@ -57,7 +57,7 @@ pub async fn start(state: Arc<AppState>) -> Result<()> {
 }
 
 /// Ping each pool instance and update health state.
-async fn health_check_all(redis: &RedisClient, evo: &evoClient) -> Result<()> {
+async fn health_check_all(redis: &RedisClient, evo: &EvoClient) -> Result<()> {
     let instances = get_all_pool_instances(redis).await?;
 
     for mut instance in instances {

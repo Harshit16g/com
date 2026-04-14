@@ -6,7 +6,7 @@ use tracing::debug;
 /// evo API HTTP client.
 /// Wraps calls to the evo API instance running in `evo/`.
 #[derive(Clone)]
-pub struct evoClient {
+pub struct EvoClient {
     client: Client,
     base_url: String,
     api_key: String,
@@ -53,7 +53,7 @@ pub struct InstanceInfo {
 }
 
 #[derive(Debug, PartialEq)]
-pub enum evoError {
+pub enum EvoError {
     /// Connection timeout / 503 / network issue — retryable
     Transient(String),
     /// HTTP 429 — respect retry-after
@@ -68,29 +68,29 @@ pub enum evoError {
     Banned(String),
 }
 
-impl std::fmt::Display for evoError {
+impl std::fmt::Display for EvoError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            evoError::Transient(m) => write!(f, "transient: {}", m),
-            evoError::RateLimit { retry_after_secs } => {
+            EvoError::Transient(m) => write!(f, "transient: {}", m),
+            EvoError::RateLimit { retry_after_secs } => {
                 write!(f, "rate_limit: retry after {}s", retry_after_secs)
             }
-            evoError::InstanceDisconnected(m) => write!(f, "instance_disconnected: {}", m),
-            evoError::AuthRequired(m) => write!(f, "auth_required: {}", m),
-            evoError::InvalidRecipient(m) => write!(f, "invalid_recipient: {}", m),
-            evoError::Banned(m) => write!(f, "banned: {}", m),
+            EvoError::InstanceDisconnected(m) => write!(f, "instance_disconnected: {}", m),
+            EvoError::AuthRequired(m) => write!(f, "auth_required: {}", m),
+            EvoError::InvalidRecipient(m) => write!(f, "invalid_recipient: {}", m),
+            EvoError::Banned(m) => write!(f, "banned: {}", m),
         }
     }
 }
 
-impl evoClient {
+impl EvoClient {
     pub fn new(base_url: &str, api_key: &str) -> Self {
         let client = Client::builder()
             .timeout(std::time::Duration::from_secs(30))
             .build()
             .expect("Failed to build HTTP client");
 
-        evoClient {
+        EvoClient {
             client,
             base_url: base_url.trim_end_matches('/').to_string(),
             api_key: api_key.to_string(),
@@ -104,7 +104,7 @@ impl evoClient {
         instance_name: &str,
         phone: &str,
         text: &str,
-    ) -> Result<String, evoError> {
+    ) -> Result<String, EvoError> {
         let url = format!("{}/message/sendText/{}", self.base_url, instance_name);
 
         let body = SendTextRequest {
@@ -138,7 +138,7 @@ impl evoClient {
                             .and_then(|v| v.to_str().ok())
                             .and_then(|s| s.parse().ok())
                             .unwrap_or(60);
-                        return Err(evoError::RateLimit {
+                        return Err(EvoError::RateLimit {
                             retry_after_secs: retry_after,
                         });
                     }
@@ -154,7 +154,7 @@ impl evoClient {
                     let body_text = resp
                         .text()
                         .await
-                        .map_err(|e| evoError::Transient(e.to_string()))?;
+                        .map_err(|e| EvoError::Transient(e.to_string()))?;
 
                     // Check for known error strings in response body
                     let lower = body_text.to_lowercase();
@@ -162,28 +162,28 @@ impl evoClient {
                         || lower.contains("auth_failed")
                         || lower.contains("unauthorized")
                     {
-                        return Err(evoError::AuthRequired(body_text));
+                        return Err(EvoError::AuthRequired(body_text));
                     }
                     if lower.contains("banned") || lower.contains("account_restricted") {
-                        return Err(evoError::Banned(body_text));
+                        return Err(EvoError::Banned(body_text));
                     }
                     if lower.contains("invalid_number")
                         || lower.contains("not_on_whatsapp")
                         || lower.contains("not registered")
                     {
-                        return Err(evoError::InvalidRecipient(body_text));
+                        return Err(EvoError::InvalidRecipient(body_text));
                     }
                     if lower.contains("instance_not_found")
                         || lower.contains("session_closed")
                         || lower.contains("disconnected")
                     {
-                        return Err(evoError::InstanceDisconnected(body_text));
+                        return Err(EvoError::InstanceDisconnected(body_text));
                     }
 
                     // Parse message ID from response
                     let send_resp: SendResponse =
                         serde_json::from_str(&body_text).map_err(|e| {
-                            evoError::Transient(format!(
+                            EvoError::Transient(format!(
                                 "Failed to parse response: {} body={}",
                                 e, body_text
                             ))
@@ -209,7 +209,7 @@ impl evoClient {
             }
         }
 
-        Err(evoError::Transient(format!(
+        Err(EvoError::Transient(format!(
             "Failed after 3 attempts: {}",
             last_error
         )))

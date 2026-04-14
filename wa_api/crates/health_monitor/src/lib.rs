@@ -4,7 +4,7 @@ use std::time::Duration;
 use tokio::time::sleep;
 use tracing::{error, info, warn};
 
-use shared::{db::DbClient, evo::evoClient, redis_client::RedisClient, types::InstanceHealth};
+use shared::{db::DbClient, evo::EvoClient, redis_client::RedisClient, types::InstanceHealth};
 
 use shared::state::AppState;
 use std::sync::Arc;
@@ -49,7 +49,7 @@ pub async fn start(state: Arc<AppState>) -> Result<()> {
 /// Check all instances registered in evo API.
 async fn check_all_instances(
     redis: &RedisClient,
-    evo: &evoClient,
+    evo: &EvoClient,
     supabase: &DbClient,
     alert_url: &Option<String>,
 ) -> Result<()> {
@@ -128,7 +128,7 @@ async fn check_all_instances(
 /// Runs every 5 minutes as per spec.
 async fn reconcile_stale_messages(
     _redis: &RedisClient,
-    _evo: &evoClient,
+    _evo: &EvoClient,
     _supabase: &DbClient,
 ) -> Result<()> {
     // In a full implementation:
