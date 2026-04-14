@@ -4,10 +4,10 @@ import { Logger } from '@config/logger.config';
 import { evoBot, IntegrationSession } from '@prisma/client';
 
 import { BaseChatbotController } from '../../base-chatbot.controller';
-import { evoBotDto } from '../dto/evoBot.dto';
-import { evoBotService } from '../services/evoBot.service';
+import { EvoBotDto } from '../dto/evoBot.dto';
+import { EvoBotService } from '../services/evoBot.service';
 
-export class EvoBotController extends BaseChatbotController<evoBot, evoBotDto> {
+export class EvoBotController extends BaseChatbotController<evoBot, EvoBotDto> {
   constructor(
     private readonly evoBotService: EvoBotService,
     prismaRepository: PrismaRepository,
@@ -43,7 +43,7 @@ export class EvoBotController extends BaseChatbotController<evoBot, evoBotDto> {
     return 'evo';
   }
 
-  protected getAdditionalBotData(data: evoBotDto): Record<string, any> {
+  protected getAdditionalBotData(data: EvoBotDto): Record<string, any> {
     return {
       apiUrl: data.apiUrl,
       apiKey: data.apiKey,
@@ -51,7 +51,7 @@ export class EvoBotController extends BaseChatbotController<evoBot, evoBotDto> {
   }
 
   // Implementation for bot-specific updates
-  protected getAdditionalUpdateFields(data: evoBotDto): Record<string, any> {
+  protected getAdditionalUpdateFields(data: EvoBotDto): Record<string, any> {
     return {
       apiUrl: data.apiUrl,
       apiKey: data.apiKey,
@@ -62,7 +62,7 @@ export class EvoBotController extends BaseChatbotController<evoBot, evoBotDto> {
   protected async validateNoDuplicatesOnUpdate(
     botId: string,
     instanceId: string,
-    data: evoBotDto,
+    data: EvoBotDto,
   ): Promise<void> {
     const checkDuplicate = await this.botRepository.findFirst({
       where: {
