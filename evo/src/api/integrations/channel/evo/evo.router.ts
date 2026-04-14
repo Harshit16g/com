@@ -3,7 +3,7 @@ import { evoController } from '@api/server.module';
 import { ConfigService } from '@config/env.config';
 import { Router } from 'express';
 
-export class evoRouter extends RouterBroker {
+export class EvoRouter extends RouterBroker {
   constructor(readonly configService: ConfigService) {
     super();
     this.router.post(this.routerPath('webhook/evo', false), async (req, res) => {

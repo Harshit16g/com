@@ -11,7 +11,7 @@ import { isURL } from 'class-validator';
 import { BaseChatbotService } from '../../base-chatbot.service';
 import { OpenaiService } from '../../openai/services/openai.service';
 
-export class evoBotService extends BaseChatbotService<evoBot, evoBotSetting> {
+export class EvoBotService extends BaseChatbotService<evoBot, evoBotSetting> {
   private openaiService: OpenaiService;
 
   constructor(
@@ -20,7 +20,7 @@ export class evoBotService extends BaseChatbotService<evoBot, evoBotSetting> {
     configService: ConfigService,
     openaiService: OpenaiService,
   ) {
-    super(waMonitor, prismaRepository, 'evoBotService', configService);
+    super(waMonitor, prismaRepository, 'EvoBotService', configService);
     this.openaiService = openaiService;
   }
 

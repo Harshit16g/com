@@ -6,7 +6,7 @@ import { evoBotController } from '@api/server.module';
 import { instanceSchema } from '@validate/instance.schema';
 import { RequestHandler, Router } from 'express';
 
-import { evoBotDto, evoBotSettingDto } from '../dto/evoBot.dto';
+import { EvoBotDto, EvoBotSettingDto } from '../dto/evoBot.dto';
 import {
   evoBotIgnoreJidSchema,
   evoBotSchema,
@@ -14,15 +14,15 @@ import {
   evoBotStatusSchema,
 } from '../validate/evoBot.schema';
 
-export class evoBotRouter extends RouterBroker {
+export class EvoBotRouter extends RouterBroker {
   constructor(...guards: RequestHandler[]) {
     super();
     this.router
       .post(this.routerPath('create'), ...guards, async (req, res) => {
-        const response = await this.dataValidate<evoBotDto>({
+        const response = await this.dataValidate<EvoBotDto>({
           request: req,
           schema: evoBotSchema,
-          ClassRef: evoBotDto,
+          ClassRef: EvoBotDto,
           execute: (instance, data) => evoBotController.createBot(instance, data),
         });
 
@@ -49,10 +49,10 @@ export class evoBotRouter extends RouterBroker {
         res.status(HttpStatus.OK).json(response);
       })
       .put(this.routerPath('update/:evoBotId'), ...guards, async (req, res) => {
-        const response = await this.dataValidate<evoBotDto>({
+        const response = await this.dataValidate<EvoBotDto>({
           request: req,
           schema: evoBotSchema,
-          ClassRef: evoBotDto,
+          ClassRef: EvoBotDto,
           execute: (instance, data) => evoBotController.updateBot(instance, req.params.evoBotId, data),
         });
 
@@ -69,10 +69,10 @@ export class evoBotRouter extends RouterBroker {
         res.status(HttpStatus.OK).json(response);
       })
       .post(this.routerPath('settings'), ...guards, async (req, res) => {
-        const response = await this.dataValidate<evoBotSettingDto>({
+        const response = await this.dataValidate<EvoBotSettingDto>({
           request: req,
           schema: evoBotSettingSchema,
-          ClassRef: evoBotSettingDto,
+          ClassRef: EvoBotSettingDto,
           execute: (instance, data) => evoBotController.settings(instance, data),
         });
 

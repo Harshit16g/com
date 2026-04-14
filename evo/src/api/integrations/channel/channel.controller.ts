@@ -8,7 +8,7 @@ import { ConfigService } from '@config/env.config';
 import { BadRequestException } from '@exceptions';
 import EventEmitter2 from 'eventemitter2';
 
-import { evoStartupService } from './evo/evo.channel.service';
+import { EvoStartupService } from './evo/evo.channel.service';
 import { BusinessStartupService } from './meta/whatsapp.business.service';
 import { BaileysStartupService } from './whatsapp/whatsapp.baileys.service';
 
@@ -68,8 +68,8 @@ export class ChannelController {
       );
     }
 
-    if (instanceData.integration === Integration.evo) {
-      return new evoStartupService(
+    if (instanceData.integration === Integration.EVO) {
+      return new EvoStartupService(
         data.configService,
         data.eventEmitter,
         data.prismaRepository,

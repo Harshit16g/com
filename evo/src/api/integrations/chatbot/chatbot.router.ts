@@ -5,7 +5,7 @@ import { TypebotRouter } from '@api/integrations/chatbot/typebot/routes/typebot.
 import { Router } from 'express';
 
 import { EvoaiRouter } from './evoai/routes/evoai.router';
-import { evoBotRouter } from './evoBot/routes/evoBot.router';
+import { EvoBotRouter } from './evoBot/routes/evoBot.router';
 import { FlowiseRouter } from './flowise/routes/flowise.router';
 import { N8nRouter } from './n8n/routes/n8n.router';
 
@@ -15,7 +15,7 @@ export class ChatbotRouter {
   constructor(...guards: any[]) {
     this.router = Router();
 
-    this.router.use('/evoBot', new evoBotRouter(...guards).router);
+    this.router.use('/evoBot', new EvoBotRouter(...guards).router);
     this.router.use('/chatwoot', new ChatwootRouter(...guards).router);
     this.router.use('/typebot', new TypebotRouter(...guards).router);
     this.router.use('/openai', new OpenaiRouter(...guards).router);

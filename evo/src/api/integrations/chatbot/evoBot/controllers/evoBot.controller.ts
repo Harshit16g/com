@@ -7,9 +7,9 @@ import { BaseChatbotController } from '../../base-chatbot.controller';
 import { evoBotDto } from '../dto/evoBot.dto';
 import { evoBotService } from '../services/evoBot.service';
 
-export class evoBotController extends BaseChatbotController<evoBot, evoBotDto> {
+export class EvoBotController extends BaseChatbotController<evoBot, evoBotDto> {
   constructor(
-    private readonly evoBotService: evoBotService,
+    private readonly evoBotService: EvoBotService,
     prismaRepository: PrismaRepository,
     waMonitor: WAMonitoringService,
   ) {
@@ -20,7 +20,7 @@ export class evoBotController extends BaseChatbotController<evoBot, evoBotDto> {
     this.sessionRepository = this.prismaRepository.integrationSession;
   }
 
-  public readonly logger = new Logger('evoBotController');
+  public readonly logger = new Logger('EvoBotController');
   protected readonly integrationName = 'evoBot';
 
   integrationEnabled = true; // Set to true by default or use config value if available

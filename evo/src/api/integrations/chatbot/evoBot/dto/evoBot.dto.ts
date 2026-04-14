@@ -1,10 +1,10 @@
 import { BaseChatbotDto, BaseChatbotSettingDto } from '../../base-chatbot.dto';
 
-export class evoBotDto extends BaseChatbotDto {
+export class EvoBotDto extends BaseChatbotDto {
   apiUrl: string;
   apiKey: string;
 }
 
-export class evoBotSettingDto extends BaseChatbotSettingDto {
+export class EvoBotSettingDto extends BaseChatbotSettingDto {
   botIdFallback?: string;
 }

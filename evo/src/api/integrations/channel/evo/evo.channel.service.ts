@@ -25,7 +25,7 @@ import mimeTypes from 'mime-types';
 import { join } from 'path';
 import { v4 } from 'uuid';
 
-export class evoStartupService extends ChannelStartupService {
+export class EvoStartupService extends ChannelStartupService {
   constructor(
     public readonly configService: ConfigService,
     public readonly eventEmitter: EventEmitter2,
