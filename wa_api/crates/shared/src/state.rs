@@ -1,8 +1,6 @@
 use tracing::info;
 
-use crate::{
-    config::AppConfig, db::DbClient, evo::evoClient, redis_client::RedisClient,
-};
+use crate::{config::AppConfig, db::DbClient, evo::evoClient, redis_client::RedisClient};
 
 #[derive(Clone)]
 pub struct AppState {

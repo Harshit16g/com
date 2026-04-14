@@ -230,10 +230,7 @@ impl evoClient {
             .await?;
 
         if !resp.status().is_success() {
-            return Err(anyhow!(
-                "HTTP {} from evo health check",
-                resp.status()
-            ));
+            return Err(anyhow!("HTTP {} from evo health check", resp.status()));
         }
 
         let body: serde_json::Value = resp.json().await?;
@@ -258,10 +255,7 @@ impl evoClient {
             .await?;
 
         if !resp.status().is_success() {
-            return Err(anyhow!(
-                "HTTP {} from evo fetchInstances",
-                resp.status()
-            ));
+            return Err(anyhow!("HTTP {} from evo fetchInstances", resp.status()));
         }
 
         Ok(resp.json().await?)
@@ -288,11 +282,7 @@ impl evoClient {
         let status = resp.status();
         let body: serde_json::Value = resp.json().await.unwrap_or_default();
         if !status.is_success() {
-            return Err(anyhow!(
-                "evo create_instance HTTP {}: {}",
-                status,
-                body
-            ));
+            return Err(anyhow!("evo create_instance HTTP {}: {}", status, body));
         }
         Ok(body)
     }
