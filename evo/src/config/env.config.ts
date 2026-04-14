@@ -448,8 +448,8 @@ export class ConfigService {
     this.env = this.envProcess();
     this.env.PRODUCTION = process.env?.NODE_ENV === 'PROD';
     if (process.env?.DOCKER_ENV === 'true') {
-      this.env.SERVER.TYPE = process.env.SERVER_TYPE as 'http' | 'http';
-      this.env.SERVER.PORT = Number.parseInt(process.env.SERVER_PORT) || 8080;
+      this.env.SERVER.TYPE = process.env.SERVER_TYPE as 'http' | 'https';
+      this.env.SERVER.PORT = Number.parseInt(process.env.PORT || process.env.SERVER_PORT) || 8080;
     }
   }
 
@@ -458,7 +458,7 @@ export class ConfigService {
       SERVER: {
         NAME: process.env?.SERVER_NAME || 'evo',
         TYPE: (process.env.SERVER_TYPE as 'http' | 'https') || 'http',
-        PORT: Number.parseInt(process.env.SERVER_PORT) || 8080,
+        PORT: Number.parseInt(process.env.PORT || process.env.SERVER_PORT) || 8080,
         URL: process.env.SERVER_URL,
         DISABLE_DOCS: process.env?.SERVER_DISABLE_DOCS === 'true',
         DISABLE_MANAGER: process.env?.SERVER_DISABLE_MANAGER === 'true',
@@ -661,21 +661,21 @@ export class ConfigService {
         SASL:
           process.env?.KAFKA_SASL_ENABLED === 'true'
             ? {
-                ENABLED: true,
-                MECHANISM: process.env?.KAFKA_SASL_MECHANISM || 'plain',
-                USERNAME: process.env?.KAFKA_SASL_USERNAME || '',
-                PASSWORD: process.env?.KAFKA_SASL_PASSWORD || '',
-              }
+              ENABLED: true,
+              MECHANISM: process.env?.KAFKA_SASL_MECHANISM || 'plain',
+              USERNAME: process.env?.KAFKA_SASL_USERNAME || '',
+              PASSWORD: process.env?.KAFKA_SASL_PASSWORD || '',
+            }
             : undefined,
         SSL:
           process.env?.KAFKA_SSL_ENABLED === 'true'
             ? {
-                ENABLED: true,
-                REJECT_UNAUTHORIZED: process.env?.KAFKA_SSL_REJECT_UNAUTHORIZED !== 'false',
-                CA: process.env?.KAFKA_SSL_CA,
-                KEY: process.env?.KAFKA_SSL_KEY,
-                CERT: process.env?.KAFKA_SSL_CERT,
-              }
+              ENABLED: true,
+              REJECT_UNAUTHORIZED: process.env?.KAFKA_SSL_REJECT_UNAUTHORIZED !== 'false',
+              CA: process.env?.KAFKA_SSL_CA,
+              KEY: process.env?.KAFKA_SSL_KEY,
+              CERT: process.env?.KAFKA_SSL_CERT,
+            }
             : undefined,
       },
       WEBSOCKET: {

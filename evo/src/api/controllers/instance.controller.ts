@@ -426,6 +426,7 @@ export class InstanceController {
 
     const instanceNames = instanceName ? [instanceName] : null;
 
+    this.logger.log('\x1b[1;32mACK SUCCESS\x1b[0m — Received ping from wa_api gateway');
     return this.waMonitor.instanceInfo(instanceNames);
   }
 

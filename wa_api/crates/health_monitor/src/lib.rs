@@ -4,9 +4,7 @@ use std::time::Duration;
 use tokio::time::sleep;
 use tracing::{error, info, warn};
 
-use shared::{
-    db::DbClient, evo::evoClient, redis_client::RedisClient, types::InstanceHealth,
-};
+use shared::{db::DbClient, evo::evoClient, redis_client::RedisClient, types::InstanceHealth};
 
 use shared::state::AppState;
 use std::sync::Arc;
@@ -19,7 +17,18 @@ pub async fn start(state: Arc<AppState>) -> Result<()> {
 
     info!("Health monitor started — checking every 5 minutes");
 
+    let mut last_ping = std::time::Instant::now();
+
     loop {
+        // Ping evo every minute
+        if last_ping.elapsed() >= Duration::from_secs(60) {
+            match evo.fetch_instances().await {
+                Ok(_) => info!("\x1b[1;32mACK SUCCESS\x1b[0m — Connection to Evolution API is stable"),
+                Err(e) => error!("\x1b[31mACK FAIL\x1b[0m — Connection to Evolution API lost: {}", e),
+            }
+            last_ping = std::time::Instant::now();
+        }
+
         if let Err(e) = check_all_instances(redis, evo, supabase, &alert_url).await {
             error!("Health monitor error: {}", e);
         }

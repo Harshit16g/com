@@ -66,11 +66,7 @@ async fn instance_health(
 
     // If ACTIVE from cache, also verify with evo API
     let evo_state = if health == shared::types::InstanceHealth::Active {
-        match state
-            .evo
-            .get_instance_status(&ctx.instance_name)
-            .await
-        {
+        match state.evo.get_instance_status(&ctx.instance_name).await {
             Ok(s) => s,
             Err(_) => "UNKNOWN".to_string(),
         }
