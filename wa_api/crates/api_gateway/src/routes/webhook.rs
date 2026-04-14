@@ -9,7 +9,7 @@ use shared::state::AppState;
 
 /// evo API webhook payload (simplified).
 #[derive(Debug, Deserialize)]
-pub struct evoWebhook {
+pub struct EvoWebhook {
     pub event: String,
     pub instance: Option<String>,
     pub data: Option<serde_json::Value>,
@@ -19,7 +19,7 @@ pub struct evoWebhook {
 /// Receives delivery receipts, incoming messages, and presence updates from evo API.
 async fn evo_webhook(
     State(state): State<Arc<AppState>>,
-    Json(payload): Json<evoWebhook>,
+    Json(payload): Json<EvoWebhook>,
 ) -> impl IntoResponse {
     match payload.event.as_str() {
         // Delivery receipt
