@@ -269,7 +269,7 @@ impl EvolutionClient {
 
     /// Create a new instance in Evolution API (admin only, 1 per partner).
     pub async fn create_instance(&self, instance_name: &str) -> Result<serde_json::Value> {
-        let url = format!("{}/instance/create", self.base_url);
+        let url = format!("{}/instance/create/", self.base_url);
         let body = serde_json::json!({
             "instanceName": instance_name,
             "qrcode": true,

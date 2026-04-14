@@ -25,7 +25,8 @@ impl AppConfig {
             evolution_base_url: required("EVOLUTION_BASE_URL")?,
             evolution_api_key: required("EVOLUTION_API_KEY")?,
             alert_webhook_url: env::var("ALERT_WEBHOOK_URL").ok(),
-            server_port: env::var("SERVER_PORT")
+            server_port: env::var("PORT")
+                .or_else(|_| env::var("SERVER_PORT"))
                 .unwrap_or_else(|_| "8080".to_string())
                 .parse()?,
             min_send_delay_secs: env::var("MIN_SEND_DELAY_SECS")

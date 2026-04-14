@@ -55,6 +55,7 @@ COPY --from=builder /evo/prisma ./prisma
 COPY --from=builder /evo/public ./public
 COPY --from=builder /evo/.env ./.env
 COPY --from=builder /evo/Docker ./Docker
+COPY --from=builder /evo/manager ./manager
 COPY --from=builder /evo/runWithProvider.js ./runWithProvider.js
 
 # Install only production dependencies (no devDependencies)
