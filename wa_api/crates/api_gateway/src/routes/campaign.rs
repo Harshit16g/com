@@ -207,7 +207,7 @@ async fn start_campaign(
             status: JobStatus::Pending,
         };
 
-        if let Ok(_) = redis.save_job(&job).await {
+        if redis.save_job(&job).await.is_ok() {
             let job_id_str = job.job_id.to_string();
             let res = if scheduled_at <= Utc::now() {
                 redis

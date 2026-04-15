@@ -37,6 +37,31 @@ impl AppConfig {
             .filter(|s| !s.is_empty())
             .collect();
 
+        let pauth_api_key = env::var("X_API_KEY")
+            .or_else(|_| env::var("PAUTH_API_KEY"))
+            .map_err(|_| anyhow::anyhow!("Missing required env var: X_API_KEY or PAUTH_API_KEY"))?;
+
+        let admin_api_key = env::var("X_ADMIN_KEY")
+            .or_else(|_| env::var("ADMIN_API_KEY"))
+            .map_err(|_| {
+                anyhow::anyhow!("Missing required env var: X_ADMIN_KEY or ADMIN_API_KEY")
+            })?;
+
+        let min_send_delay_secs: u64 = env::var("MIN_SEND_DELAY_SECS")
+            .unwrap_or_else(|_| "8".to_string())
+            .parse()?;
+        let max_send_delay_secs: u64 = env::var("MAX_SEND_DELAY_SECS")
+            .unwrap_or_else(|_| "15".to_string())
+            .parse()?;
+
+        if max_send_delay_secs < min_send_delay_secs {
+            return Err(anyhow::anyhow!(
+                "MAX_SEND_DELAY_SECS ({}) cannot be less than MIN_SEND_DELAY_SECS ({})",
+                max_send_delay_secs,
+                min_send_delay_secs
+            ));
+        }
+
         Ok(AppConfig {
             redis_url: required("REDIS_URL")?,
             database_url: required("DATABASE_URL")?,
@@ -47,17 +72,13 @@ impl AppConfig {
                 .or_else(|_| env::var("SERVER_PORT"))
                 .unwrap_or_else(|_| "8080".to_string())
                 .parse()?,
-            min_send_delay_secs: env::var("MIN_SEND_DELAY_SECS")
-                .unwrap_or_else(|_| "8".to_string())
-                .parse()?,
-            max_send_delay_secs: env::var("MAX_SEND_DELAY_SECS")
-                .unwrap_or_else(|_| "15".to_string())
-                .parse()?,
+            min_send_delay_secs,
+            max_send_delay_secs,
             platform_webhook_url: env::var("PLATFORM_WEBHOOK_URL").ok(),
             platform_api_key: env::var("PLATFORM_API_KEY").ok(),
             webhook_shared_secret: required("WEBHOOK_SHARED_SECRET")?,
-            pauth_api_key: required("PAUTH_API_KEY")?,
-            admin_api_key: required("ADMIN_API_KEY")?,
+            pauth_api_key,
+            admin_api_key,
             cors_allowed_origins,
         })
     }
