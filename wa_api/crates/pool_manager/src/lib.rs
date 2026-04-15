@@ -69,10 +69,11 @@ async fn health_check_all(redis: &RedisClient, evo: &EvoClient) -> Result<()> {
                 let _ = redis.set_instance_health(&instance.name, &health).await;
                 instance.consecutive_failures = 0;
 
-                if health == InstanceHealth::Active && instance.daily_sent < instance.daily_limit {
-                    if instance.state == PoolNumberState::Flagged.to_string() {
-                        instance.state = PoolNumberState::Active.to_string();
-                    }
+                if health == InstanceHealth::Active
+                    && instance.daily_sent < instance.daily_limit
+                    && instance.state == PoolNumberState::Flagged.to_string()
+                {
+                    instance.state = PoolNumberState::Active.to_string();
                 }
             }
             Err(_) => {
