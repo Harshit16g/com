@@ -3,7 +3,7 @@ use serde::Deserialize;
 use serde_json::json;
 use shared::utils::hash_phone;
 use std::sync::Arc;
-use tracing::info;
+use tracing::{info, error};
 
 use shared::state::AppState;
 
@@ -53,10 +53,22 @@ async fn evo_webhook(
                 };
 
                 if !msg_id.is_empty() {
-                    let _ = state
+                    if let Ok(Some(campaign_id)) = state
                         .db
                         .update_interaction_status(msg_id, delivery_status.as_str(), delivered_at)
-                        .await;
+                        .await
+                    {
+                        // R10: Atomic counter increment via RPC
+                        let (delivered, failed) = match delivery_status {
+                            shared::types::JobStatus::Delivered | shared::types::JobStatus::Read => (1, 0),
+                            shared::types::JobStatus::Failed => (0, 1),
+                            _ => (0, 0),
+                        };
+
+                        if delivered > 0 || failed > 0 {
+                            let _ = state.db.increment_campaign_counters(&campaign_id, 0, delivered, failed).await;
+                        }
+                    }
                 }
             }
         }
@@ -161,6 +173,13 @@ async fn evo_webhook(
 
                 let redis = state.redis.clone();
                 let _ = redis.set_instance_health(instance, &health).await;
+
+                // Sync to Platform (Leaex v2)
+                if let Ok(Some(tenant)) = state.db.get_tenant_by_instance_name(instance).await {
+                    if let Some(partner_id) = tenant.partner_id {
+                        sync_to_platform(&state, partner_id, instance, health.as_str()).await;
+                    }
+                }
             }
         }
 
@@ -273,6 +292,13 @@ async fn evo_webhook(
                     let key = format!("instance_qr:{}", instance);
                     let _ = redis.set_string_ex(&key, base64, 40).await;
                     info!(instance = %instance, "Stored refreshed QR code in cache");
+
+                    // Notify platform that QR is pending scan
+                    if let Ok(Some(tenant)) = state.db.get_tenant_by_instance_name(instance).await {
+                        if let Some(partner_id) = tenant.partner_id {
+                            sync_to_platform(&state, partner_id, instance, "qr_pending").await;
+                        }
+                    }
                 }
             }
         }
@@ -301,6 +327,40 @@ async fn evo_webhook(
     }
 
     (StatusCode::OK, Json(json!({"ok": true}))).into_response()
+}
+
+/// Notify the main platform (Leaex v2) of status changes.
+async fn sync_to_platform(state: &AppState, partner_id: uuid::Uuid, instance_name: &str, status: &str) {
+    let url = match &state.config.platform_webhook_url {
+        Some(u) => u,
+        None => return,
+    };
+
+    let platform_status = match status {
+        "active" | "open" | "connected" => "connected",
+        "qr_required" | "qr_pending" => "qr_pending",
+        "banned" => "banned",
+        "connecting" => "connecting",
+        _ => "disconnected",
+    };
+
+    let client = reqwest::Client::new();
+    let payload = json!({
+        "partner_id": partner_id,
+        "instance_id": instance_name,
+        "status": platform_status,
+    });
+
+    let mut request = client.post(url).json(&payload);
+    if let Some(key) = &state.config.platform_api_key {
+        request = request.header("x-platform-api-key", key);
+    }
+
+    if let Err(e) = request.send().await {
+        error!(partner_id = %partner_id, "Failed to sync status to platform: {}", e);
+    } else {
+        info!(partner_id = %partner_id, status = %platform_status, "Synced status to platform");
+    }
 }
 
 pub fn router() -> Router<Arc<AppState>> {

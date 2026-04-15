@@ -25,7 +25,7 @@ services:
       SERVER_URL: ${EVO_PUBLIC_URL:-http://localhost:8081}
       DATABASE_PROVIDER: postgresql
       DATABASE_CONNECTION_URI: postgresql://wa_api:${POSTGRES_PASSWORD:-wa_api_secret}@postgres:5432/wa_api?schema=evo
-      AUTHENTICATION_API_KEY: ${evo_API_KEY}
+      AUTHENTICATION_API_KEY: ${EVO_API_KEY}
       CACHE_REDIS_ENABLED: "true"
       CACHE_REDIS_URI: redis://redis:6379
       CACHE_LOCAL_ENABLED: "true"

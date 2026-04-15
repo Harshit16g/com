@@ -6,180 +6,157 @@ use axum::{
     response::Response,
 };
 use serde_json::json;
-use shared::{types::TenantContext, utils::sha256};
+use sha2::{Digest, Sha256};
+use shared::types::{InstanceHealth, PlanTier, TenantContext};
 use std::sync::Arc;
-use tracing::{error, warn};
+use tracing::error;
 use uuid::Uuid;
 
 use shared::state::AppState;
 
-/// Extract x-api-key from request, resolve to TenantContext, inject into extensions.
+/// Constant-time string comparison via SHA-256 hash.
+/// Prevents timing attacks by always comparing fixed-length hashes
+/// regardless of input length or content.
+fn constant_time_eq(a: &str, b: &str) -> bool {
+    let hash_a = Sha256::digest(a.as_bytes());
+    let hash_b = Sha256::digest(b.as_bytes());
+    hash_a == hash_b
+}
+
+/// Simple static authentication for the Platform (Leaex v2).
+/// Verifies x-api-key against PAUTH_API_KEY from config.
+/// Resolves tenant context using x-tenant-id (partner_id).
 pub async fn auth_middleware(
     State(state): State<Arc<AppState>>,
     mut req: Request<Body>,
     next: Next,
 ) -> Result<Response, (StatusCode, axum::Json<serde_json::Value>)> {
-    let api_key = req
+    let provided_key = req
         .headers()
         .get("x-api-key")
-        .and_then(|v| v.to_str().ok())
-        .map(|s| s.to_string());
+        .and_then(|v| v.to_str().ok());
 
-    let api_key = match api_key {
-        Some(k) => k,
-        None => {
-            return Err((
-                StatusCode::UNAUTHORIZED,
-                axum::Json(json!({"error": "Missing x-api-key header"})),
-            ))
-        }
-    };
+    let platform_key = &state.config.pauth_api_key;
 
-    // Try cache first (5 min TTL)
-    let key_hash = sha256(&api_key);
-    let redis = state.redis.clone();
-
-    if let Ok(Some(ctx)) = redis.get_cached_api_key::<TenantContext>(&key_hash).await {
-        req.extensions_mut().insert(ctx);
-        return Ok(next.run(req).await);
-    }
-
-    // Cache miss — query DB
-    let agency = match state.db.get_agency_by_api_key_hash(&key_hash).await {
-        Ok(Some(a)) => a,
-        Ok(None) => {
-            warn!("Unknown API key attempted");
-            return Err((
-                StatusCode::UNAUTHORIZED,
-                axum::Json(json!({"error": "Invalid API key"})),
-            ));
-        }
-        Err(e) => {
-            error!("DB lookup error: {}", e);
-            return Err((
-                StatusCode::INTERNAL_SERVER_ERROR,
-                axum::Json(json!({"error": "Auth service unavailable"})),
-            ));
-        }
-    };
-
-    // Validate subscription
-    if agency.subscription_status != "active" {
+    if provided_key.is_none()
+        || platform_key.is_empty()
+        || !constant_time_eq(provided_key.unwrap(), platform_key)
+    {
         return Err((
-            StatusCode::FORBIDDEN,
-            axum::Json(json!({"error": "Account suspended or not active"})),
+            StatusCode::UNAUTHORIZED,
+            axum::Json(json!({"error": "Invalid or missing API key"})),
         ));
     }
 
-    // Extract tenant_id from request extension or header
-    // For single-tenant API keys the tenant = the agency's default tenant
-    // For multi-tenant the caller passes X-Tenant-Id
-    let tenant_id_str = req
+    let partner_id = req
         .headers()
         .get("x-tenant-id")
         .and_then(|v| v.to_str().ok())
-        .map(|s| s.to_string());
+        .and_then(|v| Uuid::parse_str(v).ok())
+        .ok_or((
+            StatusCode::BAD_REQUEST,
+            axum::Json(json!({"error": "x-tenant-id (partner_id) header missing or invalid"})),
+        ))?;
 
-    let tenant_id = match tenant_id_str
-        .as_deref()
-        .and_then(|s| Uuid::parse_str(s).ok())
-    {
-        Some(id) => id,
-        None => {
-            return Err((
-                StatusCode::BAD_REQUEST,
-                axum::Json(json!({"error": "Missing X-Tenant-Id header"})),
-            ));
-        }
-    };
-
-    // Get tenant row
-    let tenant = match state.db.get_tenant(&tenant_id, &agency.id).await {
+    // Load partner config from local DB
+    let tenant = match state.db.get_tenant_by_partner_id(&partner_id).await {
         Ok(Some(t)) => t,
-        Ok(None) => {
-            return Err((
-                StatusCode::FORBIDDEN,
-                axum::Json(json!({"error": "Tenant not found or not owned by this agency"})),
-            ));
-        }
+        Ok(None) => return Err((
+            StatusCode::FORBIDDEN,
+            axum::Json(json!({"error": "Partner not found in this deployment"})),
+        )),
         Err(e) => {
             error!("Tenant DB lookup error: {}", e);
-            return Err((
-                StatusCode::INTERNAL_SERVER_ERROR,
-                axum::Json(json!({"error": "Auth service unavailable"})),
-            ));
+            return Err((StatusCode::INTERNAL_SERVER_ERROR, axum::Json(json!({"error": "auth service unavailable"}))));
         }
     };
 
-    // Validate instance state
-    if tenant.instance_status == "banned" || tenant.instance_status == "suspended" {
-        return Err((
-            StatusCode::FORBIDDEN,
-            axum::Json(json!({"error": "WhatsApp instance is banned or suspended"})),
-        ));
+    // Check instance health from Redis (Real-time gate)
+    let health = state.redis.get_instance_health(&tenant.instance_name).await
+        .unwrap_or(InstanceHealth::Disconnected);
+
+    match health {
+        InstanceHealth::Banned => return Err((StatusCode::FORBIDDEN, axum::Json(json!({"error": "WhatsApp instance is banned"})))),
+        InstanceHealth::QrRequired => {
+            let path = req.uri().path();
+            let is_setup_route = path == "/instance/qr" || path == "/instance/health" || path == "/instance/qr/regenerate";
+            if !is_setup_route {
+                return Err((StatusCode::CONFLICT, axum::Json(json!({
+                    "error": "WhatsApp instance needs re-authentication (QR scan required)",
+                    "code": "QR_REQUIRED"
+                }))));
+            }
+        }
+        _ => {}
     }
 
-    // Allow /instance/qr and /instance/health through even when QR scan is pending —
-    // those are the routes the partner uses TO complete the setup.
-    let path = req.uri().path();
-    let is_setup_route = path == "/instance/qr" || path == "/instance/health";
-
-    if tenant.instance_status == "qr_required" && !is_setup_route {
-        return Err((
-            StatusCode::CONFLICT,
-            axum::Json(
-                json!({"error": "WhatsApp instance needs re-authentication (QR scan required)", "code": "QR_REQUIRED"}),
-            ),
-        ));
-    }
-
-    let plan_tier = match agency.plan_tier.as_str() {
-        "basic" => shared::types::PlanTier::Basic,
-        "pro" => shared::types::PlanTier::Pro,
-        "enterprise" => shared::types::PlanTier::Enterprise,
-        _ => shared::types::PlanTier::Basic,
-    };
-
+    // Build context
     let ctx = TenantContext {
-        agency_id: agency.id,
-        tenant_id,
-        partner_id: tenant.partner_id.unwrap_or(Uuid::nil()),
+        tenant_id: tenant.id,   // Local DB primary key
+        partner_id,             // Platform's partner ID
+        owner_id: Uuid::nil(),  // Detailed owner_id removed for simple deployment
         instance_name: tenant.instance_name.clone(),
         wa_number: tenant.wa_number.unwrap_or_default(),
-        plan_tier,
+        plan_tier: PlanTier::Enterprise, // Default to Enterprise for dedicated deployments
         daily_limit: tenant.daily_crm_limit as u32,
         campaign_allowed: tenant.campaign_enabled,
+        key_scopes: vec!["all".to_string()], // Simplified for platform access
     };
-
-    // Cache for 5 minutes
-    let _ = redis.cache_api_key(&key_hash, &ctx).await;
 
     req.extensions_mut().insert(ctx);
     Ok(next.run(req).await)
 }
 
-/// Admin-only auth middleware — requires x-admin-key header.
+/// Admin-only auth middleware — requires x-admin-key header matching ADMIN_API_KEY from config.
+/// Uses constant-time comparison to prevent timing attacks.
 pub async fn admin_auth_middleware(
+    State(state): State<Arc<AppState>>,
     req: Request<Body>,
     next: Next,
 ) -> Result<Response, (StatusCode, axum::Json<serde_json::Value>)> {
-    let admin_key = req
+    let provided_key = req
         .headers()
         .get("x-admin-key")
-        .and_then(|v| v.to_str().ok())
-        .map(|s| s.to_string());
+        .and_then(|v| v.to_str().ok());
 
-    let expected = std::env::var("ADMIN_API_KEY").unwrap_or_default();
+    let admin_key = &state.config.admin_api_key;
 
-    match admin_key {
-        Some(k) if !expected.is_empty() && k == expected => Ok(next.run(req).await),
-        Some(_) => Err((
+    if provided_key.is_none()
+        || admin_key.is_empty()
+        || !constant_time_eq(provided_key.unwrap(), admin_key)
+    {
+        return Err((
             StatusCode::FORBIDDEN,
-            axum::Json(json!({"error": "Invalid admin key"})),
-        )),
-        None => Err((
-            StatusCode::UNAUTHORIZED,
-            axum::Json(json!({"error": "Missing x-admin-key header"})),
-        )),
+            axum::Json(json!({"error": "Invalid or missing admin key"})),
+        ));
     }
+
+    Ok(next.run(req).await)
+}
+
+/// Webhook auth middleware — verifies x-webhook-secret header from evo API instances.
+/// Supports multiple evo instances sharing the same secret.
+pub async fn webhook_auth_middleware(
+    State(state): State<Arc<AppState>>,
+    req: Request<Body>,
+    next: Next,
+) -> Result<Response, (StatusCode, axum::Json<serde_json::Value>)> {
+    let provided_secret = req
+        .headers()
+        .get("x-webhook-secret")
+        .and_then(|v| v.to_str().ok());
+
+    let expected_secret = &state.config.webhook_shared_secret;
+
+    if provided_secret.is_none()
+        || expected_secret.is_empty()
+        || !constant_time_eq(provided_secret.unwrap(), expected_secret)
+    {
+        return Err((
+            StatusCode::UNAUTHORIZED,
+            axum::Json(json!({"error": "Invalid or missing webhook secret"})),
+        ));
+    }
+
+    Ok(next.run(req).await)
 }

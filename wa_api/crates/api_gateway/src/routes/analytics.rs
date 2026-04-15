@@ -21,12 +21,30 @@ pub struct AnalyticsQuery {
     pub message_type: Option<String>,
 }
 
-#[derive(sqlx::FromRow, serde::Serialize)]
-struct InteractionRow {
+#[derive(sqlx::FromRow)]
+struct InteractionRowRaw {
     id: uuid::Uuid,
     campaign_id: Option<uuid::Uuid>,
     message_type: String,
     recipient_phone: String,
+    recipient_name: Option<String>,
+    instance_used: String,
+    status: String,
+    error_reason: Option<String>,
+    retry_count: i16,
+    scheduled_at: chrono::DateTime<chrono::Utc>,
+    sent_at: Option<chrono::DateTime<chrono::Utc>>,
+    delivered_at: Option<chrono::DateTime<chrono::Utc>>,
+    created_at: chrono::DateTime<chrono::Utc>,
+}
+
+#[derive(serde::Serialize)]
+struct InteractionRow {
+    id: uuid::Uuid,
+    campaign_id: Option<uuid::Uuid>,
+    message_type: String,
+    /// Masked phone number — never expose full PII in analytics
+    recipient_phone_masked: String,
     recipient_name: Option<String>,
     instance_used: String,
     status: String,
@@ -67,7 +85,7 @@ async fn messages_analytics(
         type_filter = "manual_crm".to_string();
     }
 
-    let rows = sqlx::query_as::<_, InteractionRow>(
+    let rows = sqlx::query_as::<_, InteractionRowRaw>(
         "SELECT id, campaign_id, message_type, recipient_phone, recipient_name, instance_used, \
          status, error_reason, retry_count, scheduled_at, sent_at, delivered_at, created_at \
          FROM wa_interaction_log \
@@ -102,7 +120,26 @@ async fn messages_analytics(
     .await;
 
     match (rows, summary) {
-        (Ok(messages), Ok(s)) => {
+        (Ok(raw_messages), Ok(s)) => {
+            // Mask phone numbers before returning to client
+            let messages: Vec<InteractionRow> = raw_messages.into_iter().map(|r| {
+                InteractionRow {
+                    id: r.id,
+                    campaign_id: r.campaign_id,
+                    message_type: r.message_type,
+                    recipient_phone_masked: shared::utils::mask_phone(&r.recipient_phone),
+                    recipient_name: r.recipient_name,
+                    instance_used: r.instance_used,
+                    status: r.status,
+                    error_reason: r.error_reason,
+                    retry_count: r.retry_count,
+                    scheduled_at: r.scheduled_at,
+                    sent_at: r.sent_at,
+                    delivered_at: r.delivered_at,
+                    created_at: r.created_at,
+                }
+            }).collect();
+
             let s_ref = s.as_ref();
             let sent = s_ref.map(|d| d.sent_today).unwrap_or(0);
             let delivered = s_ref.map(|d| d.delivered_today).unwrap_or(0);

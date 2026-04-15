@@ -18,9 +18,9 @@ pub enum PlanTier {
 /// the entire request pipeline. No service downstream may modify instance_name.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TenantContext {
-    pub agency_id: Uuid,
     pub tenant_id: Uuid,
     pub partner_id: Uuid,
+    pub owner_id: Uuid,
     /// evo API instance identifier (e.g. "wa_glamour_studio_01")
     pub instance_name: String,
     /// +91XXXXXXXXXX of the connected WhatsApp number
@@ -30,6 +30,7 @@ pub struct TenantContext {
     pub daily_limit: u32,
     /// Campaign features (Pro+ only)
     pub campaign_allowed: bool,
+    pub key_scopes: Vec<String>,
 }
 
 // ─── Message Types ──────────────────────────────────────────────────────────

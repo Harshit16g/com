@@ -1,0 +1,17 @@
+target/
+.env
+.env.local
+.env.*
+!.env.example
+*.log
+*.tmp
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+.cursor/
+.gemini/
+postgres_data/
+redis_data/
+evo_instances/
+evo_postgres_data/

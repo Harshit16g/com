@@ -1,7 +1,6 @@
 use anyhow::{anyhow, Result};
 use serde::{Deserialize, Serialize};
 use sqlx::PgPool;
-use tracing::debug;
 use uuid::Uuid;
 
 /// Direct Postgres client (bundled DB, no PostgREST layer).
@@ -13,19 +12,8 @@ pub struct DbClient {
 // ─── Row types ───────────────────────────────────────────────────────────────
 
 #[derive(Debug, sqlx::FromRow, Clone)]
-pub struct AgencyRow {
-    pub id: Uuid,
-    pub name: String,
-    pub api_key: String,
-    pub subscription_status: String,
-    pub plan_tier: String,
-    pub daily_msg_limit: i32,
-}
-
-#[derive(Debug, sqlx::FromRow, Clone)]
 pub struct TenantRow {
     pub id: Uuid,
-    pub agency_id: Uuid,
     pub partner_id: Option<Uuid>,
     pub instance_name: String,
     pub wa_number: Option<String>,
@@ -95,32 +83,32 @@ impl DbClient {
         &self.pool
     }
 
-    // ─── Auth: resolve API key to agency ─────────────────────────────────
+    // ─── Tenant Management (Now Platform-direct) ─────────────────────────
 
-    pub async fn get_agency_by_api_key_hash(&self, key_hash: &str) -> Result<Option<AgencyRow>> {
-        debug!("DB agency lookup");
-        let row = sqlx::query_as::<_, AgencyRow>(
-            "SELECT id, name, api_key, subscription_status, plan_tier, daily_msg_limit \
-             FROM agencies WHERE api_key = $1 LIMIT 1",
+    pub async fn get_tenant(&self, tenant_id: &Uuid) -> Result<Option<TenantRow>> {
+        let row = sqlx::query_as::<_, TenantRow>(
+            "SELECT id, partner_id, instance_name, wa_number, instance_status, \
+             daily_crm_limit, campaign_enabled \
+             FROM tenants WHERE id = $1 LIMIT 1",
         )
-        .bind(key_hash)
+        .bind(tenant_id)
         .fetch_optional(&self.pool)
         .await?;
         Ok(row)
     }
 
-    pub async fn get_tenant(
-        &self,
-        tenant_id: &Uuid,
-        agency_id: &Uuid,
-    ) -> Result<Option<TenantRow>> {
+    /// Alias for get_tenant — used by admin campaign routes.
+    pub async fn get_tenant_by_id(&self, tenant_id: &Uuid) -> Result<Option<TenantRow>> {
+        self.get_tenant(tenant_id).await
+    }
+
+    pub async fn get_tenant_by_partner_id(&self, partner_id: &Uuid) -> Result<Option<TenantRow>> {
         let row = sqlx::query_as::<_, TenantRow>(
-            "SELECT id, agency_id, partner_id, instance_name, wa_number, instance_status, \
+            "SELECT id, partner_id, instance_name, wa_number, instance_status, \
              daily_crm_limit, campaign_enabled \
-             FROM tenants WHERE id = $1 AND agency_id = $2 LIMIT 1",
+             FROM tenants WHERE partner_id = $1 LIMIT 1",
         )
-        .bind(tenant_id)
-        .bind(agency_id)
+        .bind(partner_id)
         .fetch_optional(&self.pool)
         .await?;
         Ok(row)
@@ -131,7 +119,7 @@ impl DbClient {
         instance_name: &str,
     ) -> Result<Option<TenantRow>> {
         let row = sqlx::query_as::<_, TenantRow>(
-            "SELECT id, agency_id, partner_id, instance_name, wa_number, instance_status, \
+            "SELECT id, partner_id, instance_name, wa_number, instance_status, \
              daily_crm_limit, campaign_enabled \
              FROM tenants WHERE instance_name = $1 LIMIT 1",
         )
@@ -195,7 +183,13 @@ impl DbClient {
              (tenant_id, campaign_id, message_type, recipient_phone_hash, recipient_phone, \
               recipient_name, instance_used, status, evo_msg_id, error_reason, \
               retry_count, scheduled_at, sent_at, idempotency_key) \
-             VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)",
+             VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14) \
+             ON CONFLICT (idempotency_key) DO UPDATE \
+             SET status = EXCLUDED.status, \
+                 evo_msg_id = COALESCE(EXCLUDED.evo_msg_id, wa_interaction_log.evo_msg_id), \
+                 error_reason = COALESCE(EXCLUDED.error_reason, wa_interaction_log.error_reason), \
+                 sent_at = COALESCE(EXCLUDED.sent_at, wa_interaction_log.sent_at), \
+                 retry_count = EXCLUDED.retry_count",
         )
         .bind(log.tenant_id)
         .bind(log.campaign_id)
@@ -221,17 +215,18 @@ impl DbClient {
         evo_msg_id: &str,
         status: &str,
         delivered_at: Option<chrono::DateTime<chrono::Utc>>,
-    ) -> Result<()> {
-        sqlx::query(
+    ) -> Result<Option<Uuid>> {
+        let row: Option<(Option<Uuid>,)> = sqlx::query_as(
             "UPDATE wa_interaction_log SET status = $1, delivered_at = $2 \
-             WHERE evo_msg_id = $3",
+             WHERE evo_msg_id = $3 \
+             RETURNING campaign_id",
         )
         .bind(status)
         .bind(delivered_at)
         .bind(evo_msg_id)
-        .execute(&self.pool)
+        .fetch_optional(&self.pool)
         .await?;
-        Ok(())
+        Ok(row.and_then(|r| r.0))
     }
 
     pub async fn update_interaction_name(&self, phone: &str, name: &str) -> Result<()> {
@@ -247,6 +242,23 @@ impl DbClient {
     }
 
     // ─── Campaign ─────────────────────────────────────────────────────────
+
+    pub async fn increment_campaign_counters(
+        &self,
+        campaign_id: &Uuid,
+        sent: i32,
+        delivered: i32,
+        failed: i32,
+    ) -> Result<()> {
+        sqlx::query("SELECT increment_campaign_counters($1, $2, $3, $4)")
+            .bind(campaign_id)
+            .bind(sent)
+            .bind(delivered)
+            .bind(failed)
+            .execute(&self.pool)
+            .await?;
+        Ok(())
+    }
 
     pub async fn update_campaign_counts(
         &self,
@@ -295,6 +307,15 @@ impl DbClient {
         .execute(&self.pool)
         .await?;
         Ok(())
+    }
+
+    // ─── Instance Management ──────────────────────────────────────────────
+
+    pub async fn get_all_instance_names(&self) -> Result<Vec<String>> {
+        let rows: Vec<(String,)> = sqlx::query_as("SELECT instance_name FROM tenants")
+            .fetch_all(&self.pool)
+            .await?;
+        Ok(rows.into_iter().map(|(n,)| n).collect())
     }
 
     // ─── Contacts / Presence ──────────────────────────────────────────────

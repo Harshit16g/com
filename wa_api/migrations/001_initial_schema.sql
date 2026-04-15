@@ -1,31 +1,20 @@
 -- ─────────────────────────────────────────────────────────────────────────────
--- Leaex WhatsApp Engine — Initial Schema (Supabase/Postgres)
+-- Leaex WhatsApp Engine — Schema v3.1 (April 2026)
+-- Direct Postgres — no Supabase RLS dependency
+-- Agency model removed: each agency gets its own wa_api deployment.
 -- ─────────────────────────────────────────────────────────────────────────────
 
 -- Enable UUID generation
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 
--- ─── agencies ────────────────────────────────────────────────────────────────
-CREATE TABLE IF NOT EXISTS agencies (
-    id                   UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    name                 TEXT NOT NULL,
-    api_key              TEXT UNIQUE NOT NULL,  -- bcrypt hash of the real key
-    subscription_status  TEXT NOT NULL DEFAULT 'active'
-                             CHECK (subscription_status IN ('active','suspended','trial')),
-    plan_tier            TEXT NOT NULL DEFAULT 'basic'
-                             CHECK (plan_tier IN ('basic','pro','enterprise')),
-    daily_msg_limit      INTEGER NOT NULL DEFAULT 200,
-    created_at           TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at           TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-
--- ─── tenants (salon partners) ─────────────────────────────────────────────────
+-- ─── tenants (partner instances) ──────────────────────────────────────────────
+-- Each row = one WhatsApp instance for one Leaex partner.
+-- partner_id links to the Leaex v2 platform's partner table.
 CREATE TABLE IF NOT EXISTS tenants (
     id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    agency_id         UUID NOT NULL REFERENCES agencies(id),
-    partner_id        UUID,                     -- links to Leaex partners table
-    instance_name     TEXT UNIQUE NOT NULL,     -- evo API instance identifier
-    wa_number         TEXT,                     -- +91XXXXXXXXXX
+    partner_id        UUID UNIQUE,                -- links to Leaex partners table (1:1 mapping)
+    instance_name     TEXT UNIQUE NOT NULL,        -- evo API instance identifier (e.g. "wa_glamour_studio_01")
+    wa_number         TEXT,                        -- +91XXXXXXXXXX of the connected WhatsApp number
     instance_status   TEXT NOT NULL DEFAULT 'disconnected'
                           CHECK (instance_status IN
                             ('active','qr_required','disconnected','banned','suspended')),
@@ -34,7 +23,6 @@ CREATE TABLE IF NOT EXISTS tenants (
     created_at        TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at        TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
-CREATE INDEX IF NOT EXISTS idx_tenants_agency ON tenants(agency_id);
 
 -- ─── wa_campaigns ─────────────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS wa_campaigns (
@@ -60,23 +48,46 @@ CREATE INDEX IF NOT EXISTS idx_campaigns_tenant ON wa_campaigns(tenant_id);
 CREATE INDEX IF NOT EXISTS idx_campaigns_status ON wa_campaigns(status);
 
 -- ─── wa_interaction_log ───────────────────────────────────────────────────────
+-- Central log for ALL WhatsApp interactions (inbound + outbound).
+-- direction + intent columns provide the interaction taxonomy.
 CREATE TABLE IF NOT EXISTS wa_interaction_log (
     id                      UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     tenant_id               UUID NOT NULL REFERENCES tenants(id),
     campaign_id             UUID REFERENCES wa_campaigns(id),
+
+    -- Direction: who initiated the interaction
+    direction               TEXT NOT NULL DEFAULT 'outbound'
+                                CHECK (direction IN ('inbound', 'outbound')),
+
+    -- Message type: specific automation/trigger type
     message_type            TEXT NOT NULL
-                                CHECK (message_type IN
-                                  ('campaign','booking_confirm','reminder','birthday',
-                                   'anniversary','manual_crm','re_engagement')),
+                                CHECK (message_type IN (
+                                    -- Outbound types
+                                    'campaign', 'booking_confirm', 'reminder', 'birthday',
+                                    'anniversary', 'manual_crm', 're_engagement',
+                                    -- Inbound types
+                                    'inbound',
+                                    -- General
+                                    'outbound', 'feedback', 'complaint'
+                                )),
+
+    -- Intent: business purpose of the interaction (nullable for legacy data)
+    intent                  TEXT
+                                CHECK (intent IS NULL OR intent IN (
+                                    'support', 'sales', 'marketing', 'feedback',
+                                    'transactional', 're_engagement', 'general'
+                                )),
+
     recipient_phone_hash    TEXT NOT NULL,   -- sha256(phone), for analytics/joins
-    recipient_phone         TEXT NOT NULL,   -- Full PII number stored securely
+    recipient_phone         TEXT NOT NULL,   -- Full PII number (to be migrated to Supabase)
     recipient_name          TEXT,            -- Full customer name
     instance_used           TEXT NOT NULL,   -- "leaex_pool" for campaigns
     status                  TEXT NOT NULL DEFAULT 'pending'
-                                CHECK (status IN
-                                  ('pending','sent','delivered','read','failed',
-                                   'deferred_spam','blocked_optout','duplicate','expired_dlq')),
-    evo_msg_id        TEXT,
+                                CHECK (status IN (
+                                    'pending', 'sent', 'delivered', 'read', 'failed',
+                                    'deferred_spam', 'blocked_optout', 'duplicate', 'expired_dlq'
+                                )),
+    evo_msg_id              TEXT,
     error_reason            TEXT,
     retry_count             SMALLINT NOT NULL DEFAULT 0,
     scheduled_at            TIMESTAMPTZ NOT NULL,
@@ -89,6 +100,7 @@ CREATE INDEX IF NOT EXISTS idx_interaction_tenant    ON wa_interaction_log(tenan
 CREATE INDEX IF NOT EXISTS idx_interaction_campaign  ON wa_interaction_log(campaign_id);
 CREATE INDEX IF NOT EXISTS idx_interaction_status    ON wa_interaction_log(status);
 CREATE INDEX IF NOT EXISTS idx_interaction_sent_at   ON wa_interaction_log(sent_at DESC);
+CREATE INDEX IF NOT EXISTS idx_interaction_direction ON wa_interaction_log(direction);
 
 -- ─── wa_customer_consent ─────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS wa_customer_consent (
@@ -113,9 +125,11 @@ CREATE TABLE IF NOT EXISTS instance_health_log (
     tenant_id        UUID REFERENCES tenants(id),
     is_pool          BOOLEAN NOT NULL DEFAULT FALSE,
     event_type       TEXT NOT NULL
-                         CHECK (event_type IN
-                           ('connected','disconnected','qr_required','banned',
-                            'health_check_ok','health_check_fail','connection_state_change')),
+                         CHECK (event_type IN (
+                             'connected', 'disconnected', 'qr_required', 'banned',
+                             'health_check_ok', 'health_check_fail',
+                             'connection_state_change', 'admin_force_qr'
+                         )),
     previous_status  TEXT NOT NULL,
     new_status       TEXT NOT NULL,
     detail           JSONB,
@@ -129,9 +143,10 @@ CREATE TABLE IF NOT EXISTS rate_limit_events (
     tenant_id           UUID REFERENCES tenants(id),
     instance_name       TEXT,
     event_type          TEXT NOT NULL
-                            CHECK (event_type IN
-                              ('daily_limit_reached','spam_guard_triggered',
-                               'adaptive_delay_increased','failure_spike')),
+                            CHECK (event_type IN (
+                                'daily_limit_reached', 'spam_guard_triggered',
+                                'adaptive_delay_increased', 'failure_spike'
+                            )),
     msg_count_at_event  INTEGER,
     detail              TEXT,
     logged_at           TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -152,50 +167,32 @@ CREATE TABLE IF NOT EXISTS pool_number_stats (
     updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- ─────────────────────────────────────────────────────────────────────────────
--- RLS Policies
--- ─────────────────────────────────────────────────────────────────────────────
-
-ALTER TABLE wa_interaction_log   ENABLE ROW LEVEL SECURITY;
-ALTER TABLE wa_campaigns         ENABLE ROW LEVEL SECURITY;
-ALTER TABLE wa_customer_consent  ENABLE ROW LEVEL SECURITY;
-ALTER TABLE pool_number_stats    ENABLE ROW LEVEL SECURITY;
-
--- Partners see only their own interaction records
-CREATE POLICY "tenant_isolation_interactions"
-ON wa_interaction_log FOR SELECT
-USING (tenant_id::TEXT = auth.jwt() ->> 'tenant_id');
-
--- Partners see only their own campaigns
-CREATE POLICY "tenant_isolation_campaigns"
-ON wa_campaigns FOR SELECT
-USING (tenant_id::TEXT = auth.jwt() ->> 'tenant_id');
-
--- Partners see their own consent + platform-wide opt-outs (tenant_id IS NULL)
-CREATE POLICY "tenant_isolation_consent"
-ON wa_customer_consent FOR SELECT
-USING (
-    tenant_id::TEXT = auth.jwt() ->> 'tenant_id'
-    OR tenant_id IS NULL
+-- ─── wa_contacts ─────────────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS wa_contacts (
+    id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    tenant_id       UUID NOT NULL REFERENCES tenants(id),
+    phone           TEXT NOT NULL,
+    name            TEXT,
+    profile_pic_url TEXT,
+    last_presence   TEXT,
+    last_seen_at    TIMESTAMPTZ,
+    updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    UNIQUE (tenant_id, phone)
 );
+CREATE INDEX IF NOT EXISTS idx_contacts_tenant ON wa_contacts(tenant_id);
 
--- Pool stats: admin only (service_role bypasses all RLS)
-CREATE POLICY "admin_only_pool_stats"
-ON pool_number_stats FOR SELECT
-USING (auth.role() = 'service_role');
+-- ─── RPC Functions ──────────────────────────────────────────────────────────
 
--- ─────────────────────────────────────────────────────────────────────────────
--- Seed: Default admin agency (update api_key hash after deploy)
--- ─────────────────────────────────────────────────────────────────────────────
--- The api_key stored here is the bcrypt hash of the raw key.
--- Raw key for dev: "leaex-dev-api-key-change-in-prod"
--- Generate a real hash via: SELECT crypt('your-key', gen_salt('bf'));
-INSERT INTO agencies (name, api_key, subscription_status, plan_tier, daily_msg_limit)
-VALUES (
-    'Leaex Platform',
-    '$2a$10$placeholder.replace.with.real.bcrypt.hash.of.your.api.key',
-    'active',
-    'enterprise',
-    10000
-)
-ON CONFLICT (api_key) DO NOTHING;
+-- R10: Atomic campaign counter updates
+CREATE OR REPLACE FUNCTION increment_campaign_counters(
+  p_campaign_id UUID, p_sent INT, p_delivered INT, p_failed INT
+) RETURNS VOID LANGUAGE plpgsql AS $$
+BEGIN
+  UPDATE wa_campaigns SET
+    sent_count      = sent_count + p_sent,
+    delivered_count = delivered_count + p_delivered,
+    failed_count    = failed_count + p_failed,
+    updated_at      = NOW()
+  WHERE id = p_campaign_id;
+END;
+$$;

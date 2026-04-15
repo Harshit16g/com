@@ -71,6 +71,11 @@ impl RedisClient {
         Ok(())
     }
 
+    pub async fn expire(&self, key: &str, ttl_secs: i64) -> Result<()> {
+        let _: () = self.pool.expire(key, ttl_secs).await?;
+        Ok(())
+    }
+
     pub async fn incr(&self, key: &str) -> Result<i64> {
         Ok(self.pool.incr(key).await?)
     }
@@ -103,6 +108,21 @@ impl RedisClient {
         Ok(result.is_some())
     }
 
+    pub async fn is_locked(&self, key: &str) -> Result<bool> {
+        self.exists(key).await
+    }
+
+    pub async fn wait_for_lock(&self, key: &str, max_wait_ms: u64) -> Result<()> {
+        let start = std::time::Instant::now();
+        while self.is_locked(key).await? {
+            if start.elapsed().as_millis() >= max_wait_ms as u128 {
+                break;
+            }
+            tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+        }
+        Ok(())
+    }
+
     // ─── Job queue operations ─────────────────────────────────────────────
 
     pub async fn zadd_scheduled(&self, tenant_id: &str, score: f64, job_id: &str) -> Result<()> {
@@ -130,33 +150,53 @@ impl RedisClient {
         Ok(())
     }
 
+    /// R3: Reliable pop using LMOVE to move job to a processing list.
+    pub async fn reliable_pop(
+        &self,
+        tenant_id: &str,
+        worker_id: usize,
+    ) -> Result<Option<String>> {
+        let source = format!("jobs:ready:{}", tenant_id);
+        let dest = format!("jobs:processing:{}", worker_id);
+
+        let job_id: Option<String> = self.pool.custom(
+            fred::types::CustomCommand::new_static("LMOVE", None, false),
+            vec![source, dest, "RIGHT".to_string(), "LEFT".to_string()]
+        ).await?;
+
+        Ok(job_id)
+    }
+
+    pub async fn remove_processing(&self, worker_id: usize, job_id: &str) -> Result<()> {
+        let key = format!("jobs:processing:{}", worker_id);
+        let _: () = self.pool.lrem(&key, 1, job_id).await?;
+        Ok(())
+    }
+
+    pub async fn lpop_processing(&self, list_key: &str) -> Result<Option<String>> {
+        Ok(self.pool.lpop(list_key, None).await?)
+    }
+
+    /// Scan all worker processing lists for recovery.
+    pub async fn scan_processing_lists(&self) -> Result<Vec<String>> {
+        let mut lists = Vec::new();
+        let mut stream = self
+            .pool
+            .next()
+            .scan_buffered("jobs:processing:*", Some(100), None);
+        while let Some(res) = stream.next().await {
+            let key: fred::types::RedisKey = res?;
+            if let Some(k_str) = key.as_str() {
+                lists.push(k_str.to_string());
+            }
+        }
+        Ok(lists)
+    }
+
     pub async fn lpush_ready(&self, tenant_id: &str, job_json: &str) -> Result<()> {
         let key = format!("jobs:ready:{}", tenant_id);
         let _: () = self.pool.lpush(&key, job_json).await?;
         Ok(())
-    }
-
-    /// Poll-based pop (Upstash does not support blocking BRPOP).
-    /// Tries each tenant's ready queue in order and returns the first job found.
-    pub async fn brpop_ready(
-        &self,
-        tenant_ids: &[String],
-        _timeout_secs: f64,
-    ) -> Result<Option<(String, String)>> {
-        if tenant_ids.is_empty() {
-            tokio::time::sleep(std::time::Duration::from_millis(200)).await;
-            return Ok(None);
-        }
-        for tenant_id in tenant_ids {
-            let key = format!("jobs:ready:{}", tenant_id);
-            let result: Option<String> = self.pool.rpop(&key, None).await?;
-            if let Some(job_json) = result {
-                return Ok(Some((key, job_json)));
-            }
-        }
-        // No jobs found — short sleep before next poll cycle
-        tokio::time::sleep(std::time::Duration::from_millis(500)).await;
-        Ok(None)
     }
 
     pub async fn lpush_dlq(&self, tenant_id: &str, job_json: &str) -> Result<()> {
@@ -170,6 +210,156 @@ impl RedisClient {
         let key = format!("jobs:ready:{}", tenant_id);
         let len: usize = self.pool.llen(&key).await?;
         Ok(len)
+    }
+
+    /// R2: Atomic move from scheduled ZSET to ready LIST using Lua.
+    pub async fn move_scheduled_to_ready(&self, tenant_id: &str, now: f64) -> Result<usize> {
+        let scheduled_key = format!("jobs:scheduled:{}", tenant_id);
+        let ready_key = format!("jobs:ready:{}", tenant_id);
+
+        let script = r#"
+            local jobs = redis.call('ZRANGEBYSCORE', KEYS[1], 0, ARGV[1])
+            for _, job_id in ipairs(jobs) do
+                redis.call('LPUSH', KEYS[2], job_id)
+                redis.call('ZREM', KEYS[1], job_id)
+            end
+            return #jobs
+        "#;
+
+        // Using custom command for EVAL to avoid trait/type issues
+        let moved_count: usize = self.pool.custom(
+            fred::types::CustomCommand::new_static("EVAL", None, false),
+            vec![
+                script.to_string(),
+                "2".to_string(),
+                scheduled_key,
+                ready_key,
+                now.to_string(),
+            ]
+        ).await?;
+
+        Ok(moved_count)
+    }
+
+    // ─── Campaign Lifecycle (Lua) ──────────────────────────────────────────
+
+    pub async fn move_jobs_to_paused(&self, tenant_id: &str, campaign_id: &str) -> Result<usize> {
+        let ready_key = format!("jobs:ready:{}", tenant_id);
+        let paused_key = format!("jobs:paused:{}:{}", tenant_id, campaign_id);
+
+        // Lua script to iterate through ready list and move matching campaign jobs.
+        // This is a O(N) operation on the ready list.
+        let script = r#"
+            local ready_key = KEYS[1]
+            local paused_key = KEYS[2]
+            local campaign_id = ARGV[1]
+            local moved = 0
+            
+            local jobs = redis.call('LRANGE', ready_key, 0, -1)
+            -- Clear ready list temporarily
+            redis.call('DEL', ready_key)
+            
+            for _, job_id in ipairs(jobs) do
+                -- Fetch job metadata to check campaign_id
+                local job_meta = redis.call('GET', 'job:' .. job_id)
+                if job_meta and string.find(job_meta, campaign_id) then
+                    redis.call('LPUSH', paused_key, job_id)
+                    moved = moved + 1
+                else
+                    -- Put back in ready list
+                    redis.call('RPUSH', ready_key, job_id)
+                end
+            end
+            return moved
+        "#;
+
+        let moved_count: usize = self.pool.custom(
+            fred::types::CustomCommand::new_static("EVAL", None, false),
+            vec![
+                script.to_string(),
+                "2".to_string(),
+                ready_key,
+                paused_key,
+                campaign_id.to_string(),
+            ]
+        ).await?;
+
+        Ok(moved_count)
+    }
+
+    pub async fn move_jobs_to_ready(&self, tenant_id: &str, campaign_id: &str) -> Result<usize> {
+        let ready_key = format!("jobs:ready:{}", tenant_id);
+        let paused_key = format!("jobs:paused:{}:{}", tenant_id, campaign_id);
+
+        let script = r#"
+            local ready_key = KEYS[1]
+            local paused_key = KEYS[2]
+            local moved = 0
+            
+            while true do
+                local job_id = redis.call('RPOP', paused_key)
+                if not job_id then break end
+                redis.call('LPUSH', ready_key, job_id)
+                moved = moved + 1
+            end
+            return moved
+        "#;
+
+        let moved_count: usize = self.pool.custom(
+            fred::types::CustomCommand::new_static("EVAL", None, false),
+            vec![
+                script.to_string(),
+                "2".to_string(),
+                ready_key,
+                paused_key,
+            ]
+        ).await?;
+
+        Ok(moved_count)
+    }
+
+    pub async fn purge_campaign_jobs(&self, tenant_id: &str, campaign_id: &str) -> Result<usize> {
+        let ready_key = format!("jobs:ready:{}", tenant_id);
+        let paused_key = format!("jobs:paused:{}:{}", tenant_id, campaign_id);
+
+        let script = r#"
+            local ready_key = KEYS[1]
+            local paused_key = KEYS[2]
+            local campaign_id = ARGV[1]
+            local purged = 0
+            
+            -- Purge paused list
+            local paused_count = redis.call('LLEN', paused_key)
+            redis.call('DEL', paused_key)
+            purged = purged + paused_count
+            
+            -- Purge from ready list
+            local jobs = redis.call('LRANGE', ready_key, 0, -1)
+            redis.call('DEL', ready_key)
+            
+            for _, job_id in ipairs(jobs) do
+                local job_meta = redis.call('GET', 'job:' .. job_id)
+                if job_meta and string.find(job_meta, campaign_id) then
+                    purged = purged + 1
+                else
+                    redis.call('RPUSH', ready_key, job_id)
+                end
+            end
+            return purged
+        "#;
+
+        let purged_count: usize = self.pool.custom(
+            fred::types::CustomCommand::new_static("EVAL", None, false),
+            vec![
+                script.to_string(),
+                "2".to_string(),
+                ready_key,
+                paused_key,
+                campaign_id.to_string(),
+            ]
+        ).await?;
+
+        Ok(purged_count)
     }
 
     // ─── Opt-out cache ────────────────────────────────────────────────────
@@ -284,6 +474,44 @@ impl RedisClient {
         Ok(raw.and_then(|s| s.parse().ok()).unwrap_or(0))
     }
 
+    /// R6: Atomic spam guard increment and check using Lua.
+    pub async fn spam_guard_check_and_incr(
+        &self,
+        phone_hash: &str,
+        limit: i64,
+        ttl_secs: u64,
+    ) -> Result<bool> {
+        let key = format!("spam_guard:{}:today", phone_hash);
+
+        let script = r#"
+            local key = KEYS[1]
+            local limit = tonumber(ARGV[1])
+            local ttl = tonumber(ARGV[2])
+            local current = redis.call('INCR', key)
+            if current == 1 then
+                redis.call('EXPIRE', key, ttl)
+            end
+            if current > limit then
+                redis.call('DECR', key)  -- roll back
+                return 0  -- blocked
+            end
+            return 1  -- allowed
+        "#;
+
+        let result: i32 = self.pool.custom(
+            fred::types::CustomCommand::new_static("EVAL", None, false),
+            vec![
+                script.to_string(),
+                "1".to_string(),
+                key,
+                limit.to_string(),
+                ttl_secs.to_string(),
+            ]
+        ).await?;
+
+        Ok(result == 1)
+    }
+
     pub async fn spam_guard_incr_week(&self, phone_hash: &str) -> Result<i64> {
         let key = format!("spam_guard:{}:week", phone_hash);
         self.incr_ex(&key, 7 * 24 * 3600).await
@@ -336,6 +564,17 @@ impl RedisClient {
     pub async fn pool_remove_available(&self, instance_name: &str) -> Result<()> {
         let _: () = self.pool.srem("pool:available", instance_name).await?;
         Ok(())
+    }
+
+    /// Track pool instance names in a Redis SET (supports per-instance key pattern).
+    pub async fn pool_add_instance_name(&self, name: &str) -> Result<()> {
+        let _: () = self.pool.sadd("pool:instance_names", name).await?;
+        Ok(())
+    }
+
+    /// Get all tracked pool instance names.
+    pub async fn pool_get_instance_names(&self) -> Result<Vec<String>> {
+        Ok(self.pool.smembers("pool:instance_names").await?)
     }
 
     // ─── Active campaigns ─────────────────────────────────────────────────
@@ -412,5 +651,26 @@ impl RedisClient {
             Some(s) => Ok(Some(serde_json::from_str(&s)?)),
             None => Ok(None),
         }
+    }
+
+    // ─── CRM Daily Counter ────────────────────────────────────────────────────
+
+    /// Increment the daily CRM send counter for a tenant. Uses IST midnight TTL.
+    pub async fn incr_crm_daily(&self, tenant_id: &str) -> Result<i64> {
+        let key = format!("crm_daily:{}", tenant_id);
+        let count: i64 = self.pool.incr(&key).await?;
+        // Set TTL only on first increment (when count == 1)
+        if count == 1 {
+            let ttl = crate::utils::seconds_until_ist_midnight();
+            let _: () = self.pool.expire(&key, ttl as i64).await?;
+        }
+        Ok(count)
+    }
+
+    /// Get the current daily CRM send count for a tenant.
+    pub async fn get_crm_daily(&self, tenant_id: &str) -> Result<i64> {
+        let key = format!("crm_daily:{}", tenant_id);
+        let count: Option<i64> = self.pool.get(&key).await?;
+        Ok(count.unwrap_or(0))
     }
 }

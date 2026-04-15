@@ -148,8 +148,8 @@ Minimum required in `.env`:
 ```env
 DATABASE_URL=postgresql://wa_api:wa_api_secret@localhost:5433/wa_api
 REDIS_URL=redis://localhost:6380
-evo_BASE_URL=http://localhost:8081
-evo_API_KEY=leaex-evo-api-key-2026
+EVO_BASE_URL=http://localhost:8081
+EVO_API_KEY=leaex-evo-api-key-2026
 ADMIN_API_KEY=change-me-in-prod
 ```
 
@@ -185,10 +185,10 @@ VALUES (
   'active', 'enterprise', 10000
 ) ON CONFLICT DO NOTHING;
 
-INSERT INTO tenants (id, agency_id, instance_name, instance_status, campaign_enabled)
+INSERT INTO tenants (id, partner_id, instance_name, instance_status, campaign_enabled)
 VALUES (
   '40e571f6-d966-4d49-8a1a-750adff9df34',
-  '58af205e-7745-4d66-9cc0-ab2dd10fe35d',
+  'a1b2c3d4-0000-0000-0000-000000000001',
   'wa_test_partner_01',
   'active', true
 ) ON CONFLICT DO NOTHING;
@@ -282,11 +282,11 @@ All configuration is via environment variables. Values shown are defaults.
 |---|---|---|---|
 | `DATABASE_URL` | Yes | — | PostgreSQL connection string. Format: `postgresql://user:pass@host:port/db` |
 | `REDIS_URL` | Yes | — | Redis connection string. `redis://host:port` or `rediss://...` for TLS |
-| `evo_BASE_URL` | Yes | — | Base URL of the evo API instance, e.g. `http://localhost:8081` |
-| `evo_API_KEY` | Yes | — | Must match `AUTHENTICATION_API_KEY` in evo API |
+| `EVO_BASE_URL` | Yes | — | Base URL of the evo API instance, e.g. `http://localhost:8081` |
+| `EVO_API_KEY` | Yes | — | Must match `AUTHENTICATION_API_KEY` in evo API |
 | `SERVER_PORT` | No | `8080` | API Gateway listen port |
 | `ADMIN_API_KEY` | Yes | — | Secret key for admin endpoints (`x-admin-key` header) |
-| `WORKER_COUNT` | No | `4` | Number of concurrent send goroutines per worker process |
+| `WORKER_COUNT` | No | `4` | Number of concurrent send tasks per worker process |
 | `MIN_SEND_DELAY_SECS` | No | `8` | Minimum inter-message delay per instance (anti-ban) |
 | `MAX_SEND_DELAY_SECS` | No | `15` | Maximum inter-message delay per instance (anti-ban) |
 | `ALERT_WEBHOOK_URL` | No | — | Slack webhook URL for BANNED/QR_REQUIRED alerts |
@@ -298,9 +298,9 @@ When running with `docker compose`, create a `.env` in `wa_api/` with:
 
 ```env
 POSTGRES_PASSWORD=your_strong_password
-evo_API_KEY=your-evo-key
+EVO_API_KEY=your-evo-key
 ADMIN_API_KEY=your-admin-key
-evo_BASE_URL=http://evo_api:8080   # if running in same network
+EVO_BASE_URL=http://evo_api:8080   # if running in same network
 ALERT_WEBHOOK_URL=https://hooks.slack.com/services/...
 WORKER_REPLICAS=4        # number of worker containers
 GATEWAY_PORT=8080        # host port for API gateway
@@ -361,7 +361,7 @@ Send a single CRM message to a phone number via the partner's personal WhatsApp 
 | 200 `status: blocked_optout` | Recipient has opted out |
 | 200 `status: spam_guard_blocked` | Daily/weekly limit reached for this number |
 
-**Phone format**: `+91XXXXXXXXXX` (E.164 format). Indian numbers only in current validation.
+**Phone format**: E.164 format (example: `+919876543210`).
 
 ---
 
@@ -475,7 +475,7 @@ Cross-tenant interaction log.
 
 ### POST /webhook/evo
 
-**No auth required.** Called by evo API to deliver:
+Requires `x-webhook-secret: <WEBHOOK_SHARED_SECRET>` header. Called by evo API to deliver:
 - `messages.update` — delivery receipts (SENT → DELIVERED → READ)
 - `messages.upsert` — incoming messages; handles `STOP`/`UNSUBSCRIBE` keyword for platform-wide opt-out
 - `connection.update` — instance state changes; updates Redis health cache
@@ -493,7 +493,7 @@ evo API is the WhatsApp bridge layer. It manages the actual WhatsApp Web session
 ```bash
 # Create a new instance
 curl -X POST http://localhost:8081/instance/create \
-  -H "apikey: <evo_API_KEY>" \
+  -H "apikey: <EVO_API_KEY>" \
   -H "Content-Type: application/json" \
   -d '{
     "instanceName": "wa_partner_salon_xyz",
@@ -503,7 +503,7 @@ curl -X POST http://localhost:8081/instance/create \
 
 # Get the QR code to scan
 curl http://localhost:8081/instance/connect/wa_partner_salon_xyz \
-  -H "apikey: <evo_API_KEY>"
+  -H "apikey: <EVO_API_KEY>"
 # Response contains base64 QR image — decode and scan with WhatsApp
 ```
 
@@ -513,12 +513,12 @@ After the partner scans QR and connects:
 
 ```sql
 -- Insert the partner as a tenant in wa_api's database
-INSERT INTO tenants (id, agency_id, instance_name, wa_number, instance_status, campaign_enabled)
+INSERT INTO tenants (id, partner_id, instance_name, wa_number, instance_status, campaign_enabled)
 VALUES (
   gen_random_uuid(),
-  '<agency_id>',
+  '<partner_id>',
   'wa_partner_salon_xyz',     -- must match instanceName in evo API exactly
-  '+919876543210',            -- the number that was connected
+  '+91XXXXXXXXXX',            -- the number that was connected
   'active',
   false                       -- set true for Pro/Enterprise
 );
@@ -531,7 +531,7 @@ Pool numbers are shared platform instances used only for bulk campaigns (never C
 ```bash
 # Register a pool number in evo API
 curl -X POST http://localhost:8081/instance/create \
-  -H "apikey: <evo_API_KEY>" \
+  -H "apikey: <EVO_API_KEY>" \
   -H "Content-Type: application/json" \
   -d '{"instanceName":"pool_number_01","qrcode":true,"integration":"WHATSAPP-BAILEYS"}'
 
@@ -557,9 +557,9 @@ Pool numbers go through a **warmup sequence**:
 # wa_api/
 cat > .env << 'EOF'
 POSTGRES_PASSWORD=<strong-random-password>
-evo_API_KEY=<strong-random-key>
+EVO_API_KEY=<strong-random-key>
 ADMIN_API_KEY=<strong-random-key>
-evo_BASE_URL=http://evo_api:8080
+EVO_BASE_URL=http://evo_api:8080
 ALERT_WEBHOOK_URL=https://hooks.slack.com/services/T.../B.../...
 WORKER_REPLICAS=4
 GATEWAY_PORT=8080
@@ -586,7 +586,7 @@ docker compose logs -f --tail=50
 # Create .env for evo
 cat > .env << 'EOF'
 EVO_POSTGRES_PASSWORD=<another-strong-password>
-evo_API_KEY=<same-key-as-wa-api>
+EVO_API_KEY=<same-key-as-wa-api>
 WA_API_WEBHOOK_URL=http://<wa-api-host>:8080
 EVO_PORT=8081
 EOF
@@ -835,7 +835,7 @@ When an instance shows `qr_required` or `disconnected`:
 1. **Get a fresh QR:**
    ```bash
    curl http://localhost:8081/instance/connect/<instance_name> \
-     -H "apikey: <evo_API_KEY>"
+     -H "apikey: <EVO_API_KEY>"
    ```
 2. **Scan with WhatsApp** on the partner's phone.
 3. **evo API fires a webhook** (`connection.update` → `open`) to `POST /webhook/evo`.
@@ -942,7 +942,7 @@ pkill -f target/release/worker
 
 ### evo API returns 401 on send
 
-The `evo_API_KEY` in `wa_api/.env` doesn't match `AUTHENTICATION_API_KEY` in `evo/.env`.
+The `EVO_API_KEY` in `wa_api/.env` doesn't match `AUTHENTICATION_API_KEY` in `evo/.env`.
 
 **Fix:** Set both to the same value and restart both services.
 

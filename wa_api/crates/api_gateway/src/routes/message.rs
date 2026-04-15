@@ -108,6 +108,22 @@ async fn send_message(
         }
     }
 
+    // ── 1.6 Daily CRM limit enforcement ────────────────────────────────────
+    // Configurable per tenant via admin — check Redis counter against tenant's daily_crm_limit
+    let daily_count = state.redis.get_crm_daily(&ctx.tenant_id.to_string()).await.unwrap_or(0);
+    if daily_count >= ctx.daily_limit as i64 {
+        return (
+            StatusCode::TOO_MANY_REQUESTS,
+            Json(json!({
+                "error": "Daily CRM message limit reached for this tenant",
+                "code": "DAILY_LIMIT_REACHED",
+                "current": daily_count,
+                "limit": ctx.daily_limit
+            })),
+        )
+            .into_response();
+    }
+
     // ── 2. Check opt-out ───────────────────────────────────────────────────
     let phone_hash = shared::utils::hash_phone(&req.phone);
 
@@ -178,18 +194,6 @@ async fn send_message(
     };
 
     // ── 5. Save job + enqueue ──────────────────────────────────────────────
-    let job_json = match serde_json::to_string(&job) {
-        Ok(j) => j,
-        Err(e) => {
-            error!("Failed to serialize job: {}", e);
-            return (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json(json!({"error": "Internal error"})),
-            )
-                .into_response();
-        }
-    };
-
     if let Err(e) = redis.save_job(&job).await {
         error!("Failed to save job: {}", e);
         return (
@@ -199,19 +203,23 @@ async fn send_message(
             .into_response();
     }
 
+    // Push only the job_id to the queue — job data is stored separately via save_job().
+    // This is consistent with campaign.rs and expected by the worker's reliable_pop.
+    let job_id_str = job_id.to_string();
+
     // If scheduled in the future, put in ZSET; else put directly in ready queue
     let now = Utc::now();
     tracing::info!("Pushing job to queue...");
     let result = if scheduled_at <= now {
         redis
-            .lpush_ready(&ctx.tenant_id.to_string(), &job_json)
+            .lpush_ready(&ctx.tenant_id.to_string(), &job_id_str)
             .await
     } else {
         redis
             .zadd_scheduled(
                 &ctx.tenant_id.to_string(),
                 scheduled_at.timestamp() as f64,
-                &job_id.to_string(),
+                &job_id_str,
             )
             .await
     };
@@ -224,6 +232,9 @@ async fn send_message(
         )
             .into_response();
     }
+
+    // Increment daily CRM counter for this tenant (IST midnight TTL)
+    let _ = state.redis.incr_crm_daily(&ctx.tenant_id.to_string()).await;
 
     info!(
         job_id = %job_id,

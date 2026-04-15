@@ -1,0 +1,755 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_CONNECTION_URI")
+}
+
+model Instance {
+  id                      String                   @id @default(cuid())
+  name                    String                   @unique @db.VarChar(255)
+  connectionStatus        InstanceConnectionStatus @default(open)
+  ownerJid                String?                  @db.VarChar(100)
+  profileName             String?                  @db.VarChar(100)
+  profilePicUrl           String?                  @db.VarChar(500)
+  integration             String?                  @db.VarChar(100)
+  number                  String?                  @db.VarChar(100)
+  businessId              String?                  @db.VarChar(100)
+  token                   String?                  @db.VarChar(255)
+  clientName              String?                  @db.VarChar(100)
+  disconnectionReasonCode Int?
+  disconnectionObject     Json?
+  disconnectionAt         DateTime?                @db.Timestamp(6)
+  createdAt               DateTime?                @default(now()) @db.Timestamp(6)
+  updatedAt               DateTime?                @updatedAt @db.Timestamp(6)
+  Chat                    Chat[]
+  Chatwoot                Chatwoot?
+  Contact                 Contact[]
+  Dify                    Dify[]
+  DifySetting             DifySetting?
+  Evoai                   Evoai[]
+  EvoaiSetting            EvoaiSetting?
+  Flowise                 Flowise[]
+  FlowiseSetting          FlowiseSetting?
+  IntegrationSession      IntegrationSession[]
+  Kafka                   Kafka?
+  Label                   Label[]
+  Media                   Media[]
+  Message                 Message[]
+  MessageUpdate           MessageUpdate[]
+  N8n                     N8n[]
+  N8nSetting              N8nSetting?
+  Nats                    Nats?
+  OpenaiBot               OpenaiBot[]
+  OpenaiCreds             OpenaiCreds[]
+  OpenaiSetting           OpenaiSetting?
+  Proxy                   Proxy?
+  Pusher                  Pusher?
+  Rabbitmq                Rabbitmq?
+  Session                 Session?
+  Setting                 Setting?
+  Sqs                     Sqs?
+  Template                Template[]
+  Typebot                 Typebot[]
+  TypebotSetting          TypebotSetting?
+  Webhook                 Webhook?
+  Websocket               Websocket?
+  evoBot                  evoBot[]
+  evoBotSetting           evoBotSetting?
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  sessionId String   @unique
+  creds     String?
+  createdAt DateTime @default(now()) @db.Timestamp(6)
+  Instance  Instance @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+}
+
+model Chat {
+  id             String    @id @default(cuid())
+  remoteJid      String    @db.VarChar(100)
+  name           String?   @db.VarChar(100)
+  labels         Json?
+  createdAt      DateTime? @default(now()) @db.Timestamp(6)
+  updatedAt      DateTime? @updatedAt @db.Timestamp(6)
+  instanceId     String
+  unreadMessages Int       @default(0)
+  Instance       Instance  @relation(fields: [instanceId], references: [id], onDelete: Cascade)
+
+  @@unique([instanceId, remoteJid])
+  @@index([instanceId])
+  @@index([remoteJid])
+}
+
+model Contact {
+  id            String    @id @default(cuid())
+  remoteJid     String    @db.VarChar(100)
+  pushName      String?   @db.VarChar(100)
+  profilePicUrl String?   @db.VarChar(500)
+  createdAt     DateTime? @default(now()) @db.Timestamp(6)
+  updatedAt     DateTime? @updatedAt @db.Timestamp(6)
+  instanceId    String
+  Instance      Instance  @relation(fields: [instanceId], references: [id], onDelete: Cascade)
+
+  @@unique([remoteJid, instanceId])
+  @@index([remoteJid])
+  @@index([instanceId])
+}
+
+model Message {
+  id                           String              @id @default(cuid())
+  key                          Json
+  pushName                     String?             @db.VarChar(100)
+  participant                  String?             @db.VarChar(100)
+  messageType                  String              @db.VarChar(100)
+  message                      Json
+  contextInfo                  Json?
+  source                       DeviceMessage
+  messageTimestamp             Int
+  chatwootMessageId            Int?
+  chatwootInboxId              Int?
+  chatwootConversationId       Int?
+  chatwootContactInboxSourceId String?             @db.VarChar(100)
+  chatwootIsRead               Boolean?
+  instanceId                   String
+  webhookUrl                   String?             @db.VarChar(500)
+  status                       String?             @db.VarChar(30)
+  sessionId                    String?
+  Media                        Media?
+  Instance                     Instance            @relation(fields: [instanceId], references: [id], onDelete: Cascade)
+  session                      IntegrationSession? @relation(fields: [sessionId], references: [id])
+  MessageUpdate                MessageUpdate[]
+
+  @@index([instanceId])
+}
+
+model MessageUpdate {
+  id          String   @id @default(cuid())
+  keyId       String   @db.VarChar(100)
+  remoteJid   String   @db.VarChar(100)
+  fromMe      Boolean
+  participant String?  @db.VarChar(100)
+  pollUpdates Json?
+  status      String   @db.VarChar(30)
+  messageId   String
+  instanceId  String
+  Instance    Instance @relation(fields: [instanceId], references: [id], onDelete: Cascade)
+  Message     Message  @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+  @@index([instanceId])
+  @@index([messageId])
+}
+
+model Webhook {
+  id              String    @id @default(cuid())
+  url             String    @db.VarChar(500)
+  headers         Json?
+  enabled         Boolean?  @default(true)
+  events          Json?
+  webhookByEvents Boolean?  @default(false)
+  webhookBase64   Boolean?  @default(false)
+  createdAt       DateTime? @default(now()) @db.Timestamp(6)
+  updatedAt       DateTime  @updatedAt @db.Timestamp(6)
+  instanceId      String    @unique
+  Instance        Instance  @relation(fields: [instanceId], references: [id], onDelete: Cascade)
+
+  @@index([instanceId])
+}
+
+model Chatwoot {
+  id                      String    @id @default(cuid())
+  enabled                 Boolean?  @default(true)
+  accountId               String?   @db.VarChar(100)
+  token                   String?   @db.VarChar(100)
+  url                     String?   @db.VarChar(500)
+  nameInbox               String?   @db.VarChar(100)
+  signMsg                 Boolean?  @default(false)
+  signDelimiter           String?   @db.VarChar(100)
+  number                  String?   @db.VarChar(100)
+  reopenConversation      Boolean?  @default(false)
+  conversationPending     Boolean?  @default(false)
+  mergeBrazilContacts     Boolean?  @default(false)
+  importContacts          Boolean?  @default(false)
+  importMessages          Boolean?  @default(false)
+  daysLimitImportMessages Int?
+  organization            String?   @db.VarChar(100)
+  logo                    String?   @db.VarChar(500)
+  ignoreJids              Json?
+  createdAt               DateTime? @default(now()) @db.Timestamp(6)
+  updatedAt               DateTime  @updatedAt @db.Timestamp(6)
+  instanceId              String    @unique
+  Instance                Instance  @relation(fields: [instanceId], references: [id], onDelete: Cascade)
+}
+
+model Label {
+  id           String    @id @default(cuid())
+  labelId      String?   @db.VarChar(100)
+  name         String    @db.VarChar(100)
+  color        String    @db.VarChar(100)
+  predefinedId String?   @db.VarChar(100)
+  createdAt    DateTime? @default(now()) @db.Timestamp(6)
+  updatedAt    DateTime  @updatedAt @db.Timestamp(6)
+  instanceId   String
+  Instance     Instance  @relation(fields: [instanceId], references: [id], onDelete: Cascade)
+
+  @@unique([labelId, instanceId])
+}
+
+model Proxy {
+  id         String    @id @default(cuid())
+  enabled    Boolean   @default(false)
+  host       String    @db.VarChar(100)
+  port       String    @db.VarChar(100)
+  protocol   String    @db.VarChar(100)
+  username   String    @db.VarChar(100)
+  password   String    @db.VarChar(100)
+  createdAt  DateTime? @default(now()) @db.Timestamp(6)
+  updatedAt  DateTime  @updatedAt @db.Timestamp(6)
+  instanceId String    @unique
+  Instance   Instance  @relation(fields: [instanceId], references: [id], onDelete: Cascade)
+}
+
+model Setting {
+  id              String    @id @default(cuid())
+  rejectCall      Boolean   @default(false)
+  msgCall         String?   @db.VarChar(100)
+  groupsIgnore    Boolean   @default(false)
+  alwaysOnline    Boolean   @default(false)
+  readMessages    Boolean   @default(false)
+  readStatus      Boolean   @default(false)
+  syncFullHistory Boolean   @default(false)
+  wavoipToken     String?   @db.VarChar(100)
+  createdAt       DateTime? @default(now()) @db.Timestamp(6)
+  updatedAt       DateTime  @updatedAt @db.Timestamp(6)
+  instanceId      String    @unique
+  Instance        Instance  @relation(fields: [instanceId], references: [id], onDelete: Cascade)
+
+  @@index([instanceId])
+}
+
+model Rabbitmq {
+  id         String    @id @default(cuid())
+  enabled    Boolean   @default(false)
+  events     Json
+  createdAt  DateTime? @default(now()) @db.Timestamp(6)
+  updatedAt  DateTime  @updatedAt @db.Timestamp(6)
+  instanceId String    @unique
+  Instance   Instance  @relation(fields: [instanceId], references: [id], onDelete: Cascade)
+}
+
+model Nats {
+  id         String    @id @default(cuid())
+  enabled    Boolean   @default(false)
+  events     Json
+  createdAt  DateTime? @default(now()) @db.Timestamp(6)
+  updatedAt  DateTime  @updatedAt @db.Timestamp(6)
+  instanceId String    @unique
+  Instance   Instance  @relation(fields: [instanceId], references: [id], onDelete: Cascade)
+}
+
+model Sqs {
+  id         String    @id @default(cuid())
+  enabled    Boolean   @default(false)
+  events     Json
+  createdAt  DateTime? @default(now()) @db.Timestamp(6)
+  updatedAt  DateTime  @updatedAt @db.Timestamp(6)
+  instanceId String    @unique
+  Instance   Instance  @relation(fields: [instanceId], references: [id], onDelete: Cascade)
+}
+
+model Kafka {
+  id         String    @id @default(cuid())
+  enabled    Boolean   @default(false)
+  events     Json
+  createdAt  DateTime? @default(now()) @db.Timestamp(6)
+  updatedAt  DateTime  @updatedAt @db.Timestamp(6)
+  instanceId String    @unique
+  Instance   Instance  @relation(fields: [instanceId], references: [id], onDelete: Cascade)
+}
+
+model Websocket {
+  id         String    @id @default(cuid())
+  enabled    Boolean   @default(false)
+  events     Json
+  createdAt  DateTime? @default(now()) @db.Timestamp(6)
+  updatedAt  DateTime  @updatedAt @db.Timestamp(6)
+  instanceId String    @unique
+  Instance   Instance  @relation(fields: [instanceId], references: [id], onDelete: Cascade)
+}
+
+model Pusher {
+  id         String    @id @default(cuid())
+  enabled    Boolean   @default(false)
+  appId      String    @db.VarChar(100)
+  key        String    @db.VarChar(100)
+  secret     String    @db.VarChar(100)
+  cluster    String    @db.VarChar(100)
+  useTLS     Boolean   @default(false)
+  events     Json
+  createdAt  DateTime? @default(now()) @db.Timestamp(6)
+  updatedAt  DateTime  @updatedAt @db.Timestamp(6)
+  instanceId String    @unique
+  Instance   Instance  @relation(fields: [instanceId], references: [id], onDelete: Cascade)
+}
+
+model Typebot {
+  id              String           @id @default(cuid())
+  enabled         Boolean          @default(true)
+  description     String?          @db.VarChar(255)
+  url             String           @db.VarChar(500)
+  typebot         String           @db.VarChar(100)
+  expire          Int?             @default(0)
+  keywordFinish   String?          @db.VarChar(100)
+  delayMessage    Int?
+  unknownMessage  String?          @db.VarChar(100)
+  listeningFromMe Boolean?         @default(false)
+  stopBotFromMe   Boolean?         @default(false)
+  keepOpen        Boolean?         @default(false)
+  debounceTime    Int?
+  createdAt       DateTime?        @default(now()) @db.Timestamp(6)
+  updatedAt       DateTime?        @updatedAt @db.Timestamp(6)
+  ignoreJids      Json?
+  triggerType     TriggerType?
+  triggerOperator TriggerOperator?
+  triggerValue    String?
+  splitMessages   Boolean?         @default(false)
+  timePerChar     Int?             @default(50)
+  instanceId      String
+  Instance        Instance         @relation(fields: [instanceId], references: [id], onDelete: Cascade)
+  TypebotSetting  TypebotSetting[]
+}
+
+model TypebotSetting {
+  id                String    @id @default(cuid())
+  expire            Int?      @default(0)
+  keywordFinish     String?   @db.VarChar(100)
+  delayMessage      Int?
+  unknownMessage    String?   @db.VarChar(100)
+  listeningFromMe   Boolean?  @default(false)
+  stopBotFromMe     Boolean?  @default(false)
+  keepOpen          Boolean?  @default(false)
+  debounceTime      Int?
+  typebotIdFallback String?   @db.VarChar(100)
+  ignoreJids        Json?
+  splitMessages     Boolean?  @default(false)
+  timePerChar       Int?      @default(50)
+  createdAt         DateTime? @default(now()) @db.Timestamp(6)
+  updatedAt         DateTime  @updatedAt @db.Timestamp(6)
+  instanceId        String    @unique
+  Instance          Instance  @relation(fields: [instanceId], references: [id], onDelete: Cascade)
+  Fallback          Typebot?  @relation(fields: [typebotIdFallback], references: [id])
+}
+
+model Media {
+  id         String    @id @default(cuid())
+  fileName   String    @db.VarChar(500)
+  type       String    @db.VarChar(100)
+  mimetype   String    @db.VarChar(100)
+  createdAt  DateTime? @default(now()) @db.Date
+  messageId  String    @unique
+  instanceId String
+  Instance   Instance  @relation(fields: [instanceId], references: [id], onDelete: Cascade)
+  Message    Message   @relation(fields: [messageId], references: [id], onDelete: Cascade)
+}
+
+model OpenaiCreds {
+  id              String         @id @default(cuid())
+  name            String?        @unique @db.VarChar(255)
+  apiKey          String?        @unique @db.VarChar(255)
+  createdAt       DateTime?      @default(now()) @db.Timestamp(6)
+  updatedAt       DateTime       @updatedAt @db.Timestamp(6)
+  instanceId      String
+  OpenaiAssistant OpenaiBot[]
+  Instance        Instance       @relation(fields: [instanceId], references: [id], onDelete: Cascade)
+  OpenaiSetting   OpenaiSetting?
+}
+
+model OpenaiBot {
+  id                String           @id @default(cuid())
+  enabled           Boolean          @default(true)
+  description       String?          @db.VarChar(255)
+  botType           OpenaiBotType
+  assistantId       String?          @db.VarChar(255)
+  functionUrl       String?          @db.VarChar(500)
+  model             String?          @db.VarChar(100)
+  systemMessages    Json?
+  assistantMessages Json?
+  userMessages      Json?
+  maxTokens         Int?
+  expire            Int?             @default(0)
+  keywordFinish     String?          @db.VarChar(100)
+  delayMessage      Int?
+  unknownMessage    String?          @db.VarChar(100)
+  listeningFromMe   Boolean?         @default(false)
+  stopBotFromMe     Boolean?         @default(false)
+  keepOpen          Boolean?         @default(false)
+  debounceTime      Int?
+  splitMessages     Boolean?         @default(false)
+  timePerChar       Int?             @default(50)
+  ignoreJids        Json?
+  triggerType       TriggerType?
+  triggerOperator   TriggerOperator?
+  triggerValue      String?
+  createdAt         DateTime?        @default(now()) @db.Timestamp(6)
+  updatedAt         DateTime         @updatedAt @db.Timestamp(6)
+  openaiCredsId     String
+  instanceId        String
+  Instance          Instance         @relation(fields: [instanceId], references: [id], onDelete: Cascade)
+  OpenaiCreds       OpenaiCreds      @relation(fields: [openaiCredsId], references: [id], onDelete: Cascade)
+  OpenaiSetting     OpenaiSetting[]
+}
+
+model IntegrationSession {
+  id         String        @id @default(cuid())
+  sessionId  String        @db.VarChar(255)
+  remoteJid  String        @db.VarChar(100)
+  pushName   String?
+  status     SessionStatus
+  awaitUser  Boolean       @default(false)
+  context    Json?
+  type       String?       @db.VarChar(100)
+  createdAt  DateTime?     @default(now()) @db.Timestamp(6)
+  updatedAt  DateTime      @updatedAt @db.Timestamp(6)
+  instanceId String
+  parameters Json?
+  botId      String?
+  Instance   Instance      @relation(fields: [instanceId], references: [id], onDelete: Cascade)
+  Message    Message[]
+}
+
+model OpenaiSetting {
+  id               String      @id @default(cuid())
+  expire           Int?        @default(0)
+  keywordFinish    String?     @db.VarChar(100)
+  delayMessage     Int?
+  unknownMessage   String?     @db.VarChar(100)
+  listeningFromMe  Boolean?    @default(false)
+  stopBotFromMe    Boolean?    @default(false)
+  keepOpen         Boolean?    @default(false)
+  debounceTime     Int?
+  ignoreJids       Json?
+  splitMessages    Boolean?    @default(false)
+  timePerChar      Int?        @default(50)
+  speechToText     Boolean?    @default(false)
+  createdAt        DateTime?   @default(now()) @db.Timestamp(6)
+  updatedAt        DateTime    @updatedAt @db.Timestamp(6)
+  openaiCredsId    String      @unique
+  openaiIdFallback String?     @db.VarChar(100)
+  instanceId       String      @unique
+  Instance         Instance    @relation(fields: [instanceId], references: [id], onDelete: Cascade)
+  OpenaiCreds      OpenaiCreds @relation(fields: [openaiCredsId], references: [id])
+  Fallback         OpenaiBot?  @relation(fields: [openaiIdFallback], references: [id])
+}
+
+model Template {
+  id         String    @id @default(cuid())
+  templateId String    @unique @db.VarChar(255)
+  name       String    @unique @db.VarChar(255)
+  template   Json
+  webhookUrl String?   @db.VarChar(500)
+  createdAt  DateTime? @default(now()) @db.Timestamp(6)
+  updatedAt  DateTime  @updatedAt @db.Timestamp(6)
+  instanceId String
+  Instance   Instance  @relation(fields: [instanceId], references: [id], onDelete: Cascade)
+}
+
+model Dify {
+  id              String           @id @default(cuid())
+  enabled         Boolean          @default(true)
+  description     String?          @db.VarChar(255)
+  botType         DifyBotType
+  apiUrl          String?          @db.VarChar(255)
+  apiKey          String?          @db.VarChar(255)
+  expire          Int?             @default(0)
+  keywordFinish   String?          @db.VarChar(100)
+  delayMessage    Int?
+  unknownMessage  String?          @db.VarChar(100)
+  listeningFromMe Boolean?         @default(false)
+  stopBotFromMe   Boolean?         @default(false)
+  keepOpen        Boolean?         @default(false)
+  debounceTime    Int?
+  ignoreJids      Json?
+  splitMessages   Boolean?         @default(false)
+  timePerChar     Int?             @default(50)
+  triggerType     TriggerType?
+  triggerOperator TriggerOperator?
+  triggerValue    String?
+  createdAt       DateTime?        @default(now()) @db.Timestamp(6)
+  updatedAt       DateTime         @updatedAt @db.Timestamp(6)
+  instanceId      String
+  Instance        Instance         @relation(fields: [instanceId], references: [id], onDelete: Cascade)
+  DifySetting     DifySetting[]
+}
+
+model DifySetting {
+  id              String    @id @default(cuid())
+  expire          Int?      @default(0)
+  keywordFinish   String?   @db.VarChar(100)
+  delayMessage    Int?
+  unknownMessage  String?   @db.VarChar(100)
+  listeningFromMe Boolean?  @default(false)
+  stopBotFromMe   Boolean?  @default(false)
+  keepOpen        Boolean?  @default(false)
+  debounceTime    Int?
+  ignoreJids      Json?
+  splitMessages   Boolean?  @default(false)
+  timePerChar     Int?      @default(50)
+  createdAt       DateTime? @default(now()) @db.Timestamp(6)
+  updatedAt       DateTime  @updatedAt @db.Timestamp(6)
+  difyIdFallback  String?   @db.VarChar(100)
+  instanceId      String    @unique
+  Fallback        Dify?     @relation(fields: [difyIdFallback], references: [id])
+  Instance        Instance  @relation(fields: [instanceId], references: [id], onDelete: Cascade)
+}
+
+model evoBot {
+  id              String           @id @default(cuid())
+  enabled         Boolean          @default(true)
+  description     String?          @db.VarChar(255)
+  apiUrl          String?          @db.VarChar(255)
+  apiKey          String?          @db.VarChar(255)
+  expire          Int?             @default(0)
+  keywordFinish   String?          @db.VarChar(100)
+  delayMessage    Int?
+  unknownMessage  String?          @db.VarChar(100)
+  listeningFromMe Boolean?         @default(false)
+  stopBotFromMe   Boolean?         @default(false)
+  keepOpen        Boolean?         @default(false)
+  debounceTime    Int?
+  ignoreJids      Json?
+  splitMessages   Boolean?         @default(false)
+  timePerChar     Int?             @default(50)
+  triggerType     TriggerType?
+  triggerOperator TriggerOperator?
+  triggerValue    String?
+  createdAt       DateTime?        @default(now()) @db.Timestamp(6)
+  updatedAt       DateTime         @updatedAt @db.Timestamp(6)
+  instanceId      String
+  Instance        Instance         @relation(fields: [instanceId], references: [id], onDelete: Cascade)
+  evoBotSetting   evoBotSetting[]
+}
+
+model evoBotSetting {
+  id              String    @id @default(cuid())
+  expire          Int?      @default(0)
+  keywordFinish   String?   @db.VarChar(100)
+  delayMessage    Int?
+  unknownMessage  String?   @db.VarChar(100)
+  listeningFromMe Boolean?  @default(false)
+  stopBotFromMe   Boolean?  @default(false)
+  keepOpen        Boolean?  @default(false)
+  debounceTime    Int?
+  ignoreJids      Json?
+  splitMessages   Boolean?  @default(false)
+  timePerChar     Int?      @default(50)
+  createdAt       DateTime? @default(now()) @db.Timestamp(6)
+  updatedAt       DateTime  @updatedAt @db.Timestamp(6)
+  botIdFallback   String?   @db.VarChar(100)
+  instanceId      String    @unique
+  Fallback        evoBot?   @relation(fields: [botIdFallback], references: [id])
+  Instance        Instance  @relation(fields: [instanceId], references: [id], onDelete: Cascade)
+}
+
+model Flowise {
+  id              String           @id @default(cuid())
+  enabled         Boolean          @default(true)
+  description     String?          @db.VarChar(255)
+  apiUrl          String?          @db.VarChar(255)
+  apiKey          String?          @db.VarChar(255)
+  expire          Int?             @default(0)
+  keywordFinish   String?          @db.VarChar(100)
+  delayMessage    Int?
+  unknownMessage  String?          @db.VarChar(100)
+  listeningFromMe Boolean?         @default(false)
+  stopBotFromMe   Boolean?         @default(false)
+  keepOpen        Boolean?         @default(false)
+  debounceTime    Int?
+  ignoreJids      Json?
+  splitMessages   Boolean?         @default(false)
+  timePerChar     Int?             @default(50)
+  triggerType     TriggerType?
+  triggerOperator TriggerOperator?
+  triggerValue    String?
+  createdAt       DateTime?        @default(now()) @db.Timestamp(6)
+  updatedAt       DateTime         @updatedAt @db.Timestamp(6)
+  instanceId      String
+  Instance        Instance         @relation(fields: [instanceId], references: [id], onDelete: Cascade)
+  FlowiseSetting  FlowiseSetting[]
+}
+
+model FlowiseSetting {
+  id                String    @id @default(cuid())
+  expire            Int?      @default(0)
+  keywordFinish     String?   @db.VarChar(100)
+  delayMessage      Int?
+  unknownMessage    String?   @db.VarChar(100)
+  listeningFromMe   Boolean?  @default(false)
+  stopBotFromMe     Boolean?  @default(false)
+  keepOpen          Boolean?  @default(false)
+  debounceTime      Int?
+  ignoreJids        Json?
+  splitMessages     Boolean?  @default(false)
+  timePerChar       Int?      @default(50)
+  createdAt         DateTime? @default(now()) @db.Timestamp(6)
+  updatedAt         DateTime  @updatedAt @db.Timestamp(6)
+  flowiseIdFallback String?   @db.VarChar(100)
+  instanceId        String    @unique
+  Fallback          Flowise?  @relation(fields: [flowiseIdFallback], references: [id])
+  Instance          Instance  @relation(fields: [instanceId], references: [id], onDelete: Cascade)
+}
+
+model IsOnWhatsapp {
+  id         String   @id @default(cuid())
+  remoteJid  String   @unique @db.VarChar(100)
+  jidOptions String
+  lid        String?  @db.VarChar(100)
+  createdAt  DateTime @default(now()) @db.Timestamp(6)
+  updatedAt  DateTime @updatedAt @db.Timestamp(6)
+}
+
+model N8n {
+  id              String           @id @default(cuid())
+  enabled         Boolean          @default(true)
+  description     String?          @db.VarChar(255)
+  webhookUrl      String?          @db.VarChar(255)
+  basicAuthUser   String?          @db.VarChar(255)
+  basicAuthPass   String?          @db.VarChar(255)
+  expire          Int?             @default(0)
+  keywordFinish   String?          @db.VarChar(100)
+  delayMessage    Int?
+  unknownMessage  String?          @db.VarChar(100)
+  listeningFromMe Boolean?         @default(false)
+  stopBotFromMe   Boolean?         @default(false)
+  keepOpen        Boolean?         @default(false)
+  debounceTime    Int?
+  ignoreJids      Json?
+  splitMessages   Boolean?         @default(false)
+  timePerChar     Int?             @default(50)
+  triggerType     TriggerType?
+  triggerOperator TriggerOperator?
+  triggerValue    String?
+  createdAt       DateTime?        @default(now()) @db.Timestamp(6)
+  updatedAt       DateTime         @updatedAt @db.Timestamp(6)
+  instanceId      String
+  Instance        Instance         @relation(fields: [instanceId], references: [id], onDelete: Cascade)
+  N8nSetting      N8nSetting[]
+}
+
+model N8nSetting {
+  id              String    @id @default(cuid())
+  expire          Int?      @default(0)
+  keywordFinish   String?   @db.VarChar(100)
+  delayMessage    Int?
+  unknownMessage  String?   @db.VarChar(100)
+  listeningFromMe Boolean?  @default(false)
+  stopBotFromMe   Boolean?  @default(false)
+  keepOpen        Boolean?  @default(false)
+  debounceTime    Int?
+  ignoreJids      Json?
+  splitMessages   Boolean?  @default(false)
+  timePerChar     Int?      @default(50)
+  createdAt       DateTime? @default(now()) @db.Timestamp(6)
+  updatedAt       DateTime  @updatedAt @db.Timestamp(6)
+  n8nIdFallback   String?   @db.VarChar(100)
+  instanceId      String    @unique
+  Instance        Instance  @relation(fields: [instanceId], references: [id], onDelete: Cascade)
+  Fallback        N8n?      @relation(fields: [n8nIdFallback], references: [id])
+}
+
+model Evoai {
+  id              String           @id @default(cuid())
+  enabled         Boolean          @default(true)
+  description     String?          @db.VarChar(255)
+  agentUrl        String?          @db.VarChar(255)
+  apiKey          String?          @db.VarChar(255)
+  expire          Int?             @default(0)
+  keywordFinish   String?          @db.VarChar(100)
+  delayMessage    Int?
+  unknownMessage  String?          @db.VarChar(100)
+  listeningFromMe Boolean?         @default(false)
+  stopBotFromMe   Boolean?         @default(false)
+  keepOpen        Boolean?         @default(false)
+  debounceTime    Int?
+  ignoreJids      Json?
+  splitMessages   Boolean?         @default(false)
+  timePerChar     Int?             @default(50)
+  triggerType     TriggerType?
+  triggerOperator TriggerOperator?
+  triggerValue    String?
+  createdAt       DateTime?        @default(now()) @db.Timestamp(6)
+  updatedAt       DateTime         @updatedAt @db.Timestamp(6)
+  instanceId      String
+  Instance        Instance         @relation(fields: [instanceId], references: [id], onDelete: Cascade)
+  EvoaiSetting    EvoaiSetting[]
+}
+
+model EvoaiSetting {
+  id              String    @id @default(cuid())
+  expire          Int?      @default(0)
+  keywordFinish   String?   @db.VarChar(100)
+  delayMessage    Int?
+  unknownMessage  String?   @db.VarChar(100)
+  listeningFromMe Boolean?  @default(false)
+  stopBotFromMe   Boolean?  @default(false)
+  keepOpen        Boolean?  @default(false)
+  debounceTime    Int?
+  ignoreJids      Json?
+  splitMessages   Boolean?  @default(false)
+  timePerChar     Int?      @default(50)
+  createdAt       DateTime? @default(now()) @db.Timestamp(6)
+  updatedAt       DateTime  @updatedAt @db.Timestamp(6)
+  evoaiIdFallback String?   @db.VarChar(100)
+  instanceId      String    @unique
+  Fallback        Evoai?    @relation(fields: [evoaiIdFallback], references: [id])
+  Instance        Instance  @relation(fields: [instanceId], references: [id], onDelete: Cascade)
+}
+
+enum InstanceConnectionStatus {
+  open
+  close
+  connecting
+}
+
+enum DeviceMessage {
+  ios
+  android
+  web
+  unknown
+  desktop
+}
+
+enum SessionStatus {
+  opened
+  closed
+  paused
+}
+
+enum TriggerType {
+  all
+  keyword
+  none
+  advanced
+}
+
+enum TriggerOperator {
+  contains
+  equals
+  startsWith
+  endsWith
+  regex
+}
+
+enum OpenaiBotType {
+  assistant
+  chatCompletion
+}
+
+enum DifyBotType {
+  chatBot
+  textGenerator
+  agent
+  workflow
+}

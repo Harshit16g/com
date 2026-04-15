@@ -16,7 +16,7 @@ tokio = { version = "1", features = ["full"] }
 # HTTP framework
 axum = { version = "0.7", features = ["macros"] }
 tower = { version = "0.4" }
-tower-http = { version = "0.5", features = ["cors", "trace"] }
+tower-http = { version = "0.5", features = ["cors", "trace", "limit"] }
 hyper = { version = "1" }
 
 # Serialization
@@ -31,7 +31,7 @@ native-tls = "0.2"
 reqwest = { version = "0.12", features = ["json", "rustls-tls"], default-features = false }
 
 # Database (bundled Postgres via sqlx)
-sqlx = { version = "0.8", features = ["runtime-tokio-rustls", "postgres", "uuid", "chrono", "derive"], default-features = false }
+sqlx = { version = "0.8", features = ["runtime-tokio-rustls", "postgres", "uuid", "chrono", "derive", "macros"], default-features = false }
 
 # UUID
 uuid = { version = "1", features = ["v4", "serde"] }
@@ -43,6 +43,8 @@ chrono = { version = "0.4", features = ["serde"] }
 sha2 = "0.10"
 hex = "0.4"
 bcrypt = "0.15"
+argon2 = "0.5"
+base64 = "0.22"
 
 # Error handling
 anyhow = "1"

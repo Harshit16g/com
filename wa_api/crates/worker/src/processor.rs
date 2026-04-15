@@ -5,7 +5,7 @@ use shared::{
     evo::EvoError,
     redis_client::RedisClient,
     types::{InstanceHealth, JobStatus, MessagePayload, WhatsAppJob},
-    utils::{hash_phone, now_unix_i64},
+    utils::{hash_phone, now_unix_i64, seconds_until_ist_midnight},
 };
 use std::sync::Arc;
 use std::time::Duration;
@@ -22,7 +22,7 @@ pub async fn run_worker(worker_id: usize, state: Arc<AppState>) {
 
     loop {
         // Get tenant queues to listen on
-        let tenant_ids = match state.redis.clone().scan_ready_tenants().await {
+        let tenant_ids = match state.redis.scan_ready_tenants().await {
             Ok(ids) if !ids.is_empty() => ids,
             _ => {
                 sleep(Duration::from_millis(500)).await;
@@ -30,27 +30,29 @@ pub async fn run_worker(worker_id: usize, state: Arc<AppState>) {
             }
         };
 
-        // BRPOP with 1s timeout
-        tracing::info!("Waiting for job...");
-        let job_result = state.redis.clone().brpop_ready(&tenant_ids, 1.0).await;
-
-        match job_result {
-            Ok(Some((_, job_json))) => match serde_json::from_str::<WhatsAppJob>(&job_json) {
-                Ok(job) => {
-                    tracing::info!("Job received!");
-                    process_job(worker_id, job, Arc::clone(&state)).await;
+        // R3: Reliable pop using LMOVE
+        let mut job_found = false;
+        for tenant_id in tenant_ids {
+            match state.redis.reliable_pop(&tenant_id, worker_id).await {
+                Ok(Some(job_id_str)) => {
+                    tracing::info!(worker_id, job_id = %job_id_str, "Job received reliably");
+                    if let Ok(Some(job)) = state.redis.get_job(&job_id_str).await {
+                        process_job(worker_id, job, Arc::clone(&state)).await;
+                        // R3: Remove from processing list after completion
+                        let _ = state.redis.remove_processing(worker_id, &job_id_str).await;
+                    }
+                    job_found = true;
+                    break;
                 }
+                Ok(None) => continue,
                 Err(e) => {
-                    error!(worker_id, "Failed to deserialize job: {}", e);
+                    error!(worker_id, "Reliable pop error: {}", e);
                 }
-            },
-            Ok(None) => {
-                // Timeout — no jobs, continue
             }
-            Err(e) => {
-                error!(worker_id, "BRPOP error: {}", e);
-                sleep(Duration::from_secs(1)).await;
-            }
+        }
+
+        if !job_found {
+            sleep(Duration::from_millis(500)).await;
         }
     }
 }
@@ -97,7 +99,7 @@ async fn process_job(worker_id: usize, job: WhatsAppJob, state: Arc<AppState>) {
     // ── Step 2: Acquire per-instance send lock (prevents concurrent sends) ─
     let lock_key = format!("send_lock:{}", instance);
     let got_lock = redis
-        .set_nx_ex(&lock_key, &job_id.to_string(), 30)
+        .set_nx_ex(&lock_key, &job_id.to_string(), 60)
         .await
         .unwrap_or(false);
 
@@ -118,10 +120,11 @@ async fn process_job(worker_id: usize, job: WhatsAppJob, state: Arc<AppState>) {
     )
     .await;
 
-    // ── Step 4: Spam guard double-check ───────────────────────────────────
+    // ── Step 4: Spam guard double-check (R6: Atomic) ──────────────────────
     let phone_hash = hash_phone(&job.recipient_phone);
-    let today_count = redis.spam_guard_get_today(&phone_hash).await.unwrap_or(0);
-    if today_count >= 5 {
+    let ttl = seconds_until_ist_midnight();
+    let allowed = redis.spam_guard_check_and_incr(&phone_hash, 5, ttl).await.unwrap_or(false);
+    if !allowed {
         warn!(job_id = %job_id, "Spam guard blocked at worker — deferring");
         defer_to_tomorrow(&redis, &job).await;
         // Release lock
@@ -157,16 +160,35 @@ async fn process_job(worker_id: usize, job: WhatsAppJob, state: Arc<AppState>) {
         return;
     }
 
-    // ── Step 7: Send via evo API ────────────────────────────────────
+    // ── Step 6.5: R4 - Insert PENDING row to DB before sending ────────────
+    persist_status(&state.db, &job, JobStatus::Pending, None, None).await;
+
+    // ── Step 7: Send via evo API (R5/R14: Timeout + Heartbeat) ───────────
     let text = match &job.payload {
         MessagePayload::Text { body } => body.clone(),
         MessagePayload::Template { body, .. } => body.clone(),
     };
 
-    let send_result = state
-        .evo
-        .send_text(instance, &job.recipient_phone, &text)
-        .await;
+    // Spawn heartbeat task to keep the lock alive
+    let heartbeat_redis = redis.clone();
+    let heartbeat_lock = lock_key.clone();
+    let heartbeat_handle = tokio::spawn(async move {
+        loop {
+            tokio::time::sleep(Duration::from_secs(10)).await;
+            if let Err(e) = heartbeat_redis.expire(&heartbeat_lock, 60).await {
+                error!("Failed to renew send lock: {}", e);
+                break;
+            }
+        }
+    });
+
+    let send_result = tokio::time::timeout(
+        Duration::from_secs(25),
+        state.evo.send_text(instance, &job.recipient_phone, &text)
+    ).await;
+
+    // Stop heartbeat task
+    heartbeat_handle.abort();
 
     // ── Step 8: Update rate limit timestamp ───────────────────────────────
     let _ = redis.set_last_sent(instance, now_unix_i64()).await;
@@ -175,14 +197,13 @@ async fn process_job(worker_id: usize, job: WhatsAppJob, state: Arc<AppState>) {
 
     // ── Step 9: Handle result ─────────────────────────────────────────────
     match send_result {
-        Ok(msg_id) => {
+        Ok(Ok(msg_id)) => {
             info!(job_id = %job_id, msg_id = %msg_id, "Message sent successfully");
 
             // Mark idempotency
             let _ = redis.mark_sent(&job.idempotency_key).await;
 
-            // Increment spam counters
-            let _ = redis.spam_guard_incr_today(&phone_hash).await;
+            // Increment other counters (non-critical if they fail)
             let _ = redis.spam_guard_incr_week(&phone_hash).await;
             let _ = redis.incr_partner_daily(tenant_id, &phone_hash).await;
             let _ = redis
@@ -190,11 +211,17 @@ async fn process_job(worker_id: usize, job: WhatsAppJob, state: Arc<AppState>) {
                 .await;
 
             persist_status(&state.db, &job, JobStatus::Sent, Some(msg_id), None).await;
+
+            // R10: Atomic campaign counter increment
+            if let Some(campaign_id) = job.campaign_id {
+                let _ = state.db.increment_campaign_counters(&campaign_id, 1, 0, 0).await;
+            }
         }
 
-        Err(e @ (EvoError::Transient(_) | EvoError::RateLimit { .. })) => {
-            let retry_after = match &e {
-                EvoError::RateLimit { retry_after_secs } => *retry_after_secs,
+        Ok(Err(EvoError::Transient(_))) | Ok(Err(EvoError::RateLimit { .. })) | Err(_) => {
+            let retry_after = match &send_result {
+                Ok(Err(EvoError::RateLimit { retry_after_secs })) => *retry_after_secs,
+                Err(_) => 30, // Timeout retry after 30s
                 _ => RETRY_DELAYS
                     .get(job.retry_count as usize)
                     .copied()
@@ -203,14 +230,14 @@ async fn process_job(worker_id: usize, job: WhatsAppJob, state: Arc<AppState>) {
 
             if job.retry_count >= 3 {
                 error!(job_id = %job_id, "Max retries exceeded — DLQ");
-                move_to_dlq(&redis, &job, &e.to_string()).await;
+                move_to_dlq(&redis, &job, "max_retries_exceeded").await;
             } else {
                 warn!(job_id = %job_id, retry_count = job.retry_count, retry_after, "Retrying job");
                 retry_with_delay(&redis, &job, retry_after).await;
             }
         }
 
-        Err(EvoError::InstanceDisconnected(_msg)) => {
+        Ok(Err(EvoError::InstanceDisconnected(_msg))) => {
             warn!(instance = %instance, "Instance disconnected — pausing jobs");
             let _ = redis
                 .set_instance_health(instance, &InstanceHealth::Disconnected)
@@ -218,7 +245,7 @@ async fn process_job(worker_id: usize, job: WhatsAppJob, state: Arc<AppState>) {
             requeue_with_delay(&redis, &job, 300).await;
         }
 
-        Err(EvoError::AuthRequired(_msg)) => {
+        Ok(Err(EvoError::AuthRequired(_msg))) => {
             warn!(instance = %instance, "Auth required — moving to DLQ");
             let _ = redis
                 .set_instance_health(instance, &InstanceHealth::QrRequired)
@@ -226,7 +253,7 @@ async fn process_job(worker_id: usize, job: WhatsAppJob, state: Arc<AppState>) {
             move_to_dlq(&redis, &job, "instance_needs_auth").await;
         }
 
-        Err(EvoError::InvalidRecipient(msg)) => {
+        Ok(Err(EvoError::InvalidRecipient(msg))) => {
             warn!(job_id = %job_id, "Invalid recipient — permanent failure");
             persist_status(
                 &state.db,
@@ -238,7 +265,7 @@ async fn process_job(worker_id: usize, job: WhatsAppJob, state: Arc<AppState>) {
             .await;
         }
 
-        Err(EvoError::Banned(msg)) => {
+        Ok(Err(EvoError::Banned(msg))) => {
             error!(instance = %instance, "INSTANCE BANNED — escalating");
             let _ = redis
                 .set_instance_health(instance, &InstanceHealth::Banned)

@@ -86,7 +86,8 @@ impl std::fmt::Display for EvoError {
 impl EvoClient {
     pub fn new(base_url: &str, api_key: &str) -> Self {
         let client = Client::builder()
-            .timeout(std::time::Duration::from_secs(30))
+            .timeout(std::time::Duration::from_secs(20))
+            .connect_timeout(std::time::Duration::from_secs(5))
             .build()
             .expect("Failed to build HTTP client");
 
@@ -263,7 +264,7 @@ impl EvoClient {
 
     /// Create a new instance in evo API (admin only, 1 per partner).
     pub async fn create_instance(&self, instance_name: &str) -> Result<serde_json::Value> {
-        let url = format!("{}/instance/create/", self.base_url);
+        let url = format!("{}/instance/create", self.base_url);
         let body = serde_json::json!({
             "instanceName": instance_name,
             "qrcode": true,
@@ -285,6 +286,24 @@ impl EvoClient {
             return Err(anyhow!("evo create_instance HTTP {}: {}", status, body));
         }
         Ok(body)
+    }
+
+    /// Delete an instance from evo API.
+    pub async fn delete_instance(&self, instance_name: &str) -> Result<()> {
+        let url = format!("{}/instance/delete/{}", self.base_url, instance_name);
+        let resp = self
+            .client
+            .delete(&url)
+            .header("apikey", &self.api_key)
+            .send()
+            .await?;
+
+        if !resp.status().is_success() && resp.status() != 404 {
+            let status = resp.status();
+            let body: serde_json::Value = resp.json().await.unwrap_or_default();
+            return Err(anyhow!("evo delete_instance HTTP {}: {}", status, body));
+        }
+        Ok(())
     }
 
     /// Get QR code base64 for an instance (for partner connect flow).
