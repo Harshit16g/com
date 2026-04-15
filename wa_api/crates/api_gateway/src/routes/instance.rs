@@ -1,5 +1,9 @@
 use axum::{
-    extract::State, http::StatusCode, response::IntoResponse, routing::{get, post}, Extension, Json, Router,
+    extract::State,
+    http::StatusCode,
+    response::IntoResponse,
+    routing::{get, post},
+    Extension, Json, Router,
 };
 use serde::Deserialize;
 use serde_json::json;
@@ -40,7 +44,9 @@ async fn instance_qr_regenerate(
 
     // 2. State Check: only allow if not ACTIVE.
     let redis = state.redis.clone();
-    let health = redis.get_instance_health(&ctx.instance_name).await
+    let health = redis
+        .get_instance_health(&ctx.instance_name)
+        .await
         .unwrap_or(InstanceHealth::Disconnected);
 
     if health == InstanceHealth::Active {
@@ -77,7 +83,11 @@ async fn instance_qr_regenerate(
             .into_response(),
         Err(e) => {
             error!("QR regeneration error for {}: {}", ctx.instance_name, e);
-            (StatusCode::BAD_GATEWAY, Json(json!({ "error": e.to_string() }))).into_response()
+            (
+                StatusCode::BAD_GATEWAY,
+                Json(json!({ "error": e.to_string() })),
+            )
+                .into_response()
         }
     }
 }

@@ -79,7 +79,9 @@ async fn health_check_all(redis: &RedisClient, evo: &EvoClient) -> Result<()> {
                 instance.consecutive_failures += 1;
                 if instance.consecutive_failures >= 3 {
                     instance.state = PoolNumberState::Flagged.to_string();
-                    let _ = redis.set_instance_health(&instance.name, &InstanceHealth::Flagged).await;
+                    let _ = redis
+                        .set_instance_health(&instance.name, &InstanceHealth::Flagged)
+                        .await;
                 }
             }
         }

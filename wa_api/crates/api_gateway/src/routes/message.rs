@@ -110,7 +110,11 @@ async fn send_message(
 
     // ── 1.6 Daily CRM limit enforcement ────────────────────────────────────
     // Configurable per tenant via admin — check Redis counter against tenant's daily_crm_limit
-    let daily_count = state.redis.get_crm_daily(&ctx.tenant_id.to_string()).await.unwrap_or(0);
+    let daily_count = state
+        .redis
+        .get_crm_daily(&ctx.tenant_id.to_string())
+        .await
+        .unwrap_or(0);
     if daily_count >= ctx.daily_limit as i64 {
         return (
             StatusCode::TOO_MANY_REQUESTS,

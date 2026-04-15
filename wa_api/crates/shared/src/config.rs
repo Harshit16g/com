@@ -30,8 +30,7 @@ impl AppConfig {
     pub fn from_env() -> Result<Self> {
         let _ = dotenv(); // ignore if .env missing (Railway uses real env vars)
 
-        let cors_origins_str = env::var("CORS_ALLOWED_ORIGINS")
-            .unwrap_or_else(|_| "*".to_string());
+        let cors_origins_str = env::var("CORS_ALLOWED_ORIGINS").unwrap_or_else(|_| "*".to_string());
         let cors_allowed_origins: Vec<String> = cors_origins_str
             .split(',')
             .map(|s| s.trim().to_string())

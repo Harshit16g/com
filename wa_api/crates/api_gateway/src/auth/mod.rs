@@ -31,10 +31,7 @@ pub async fn auth_middleware(
     mut req: Request<Body>,
     next: Next,
 ) -> Result<Response, (StatusCode, axum::Json<serde_json::Value>)> {
-    let provided_key = req
-        .headers()
-        .get("x-api-key")
-        .and_then(|v| v.to_str().ok());
+    let provided_key = req.headers().get("x-api-key").and_then(|v| v.to_str().ok());
 
     let platform_key = &state.config.pauth_api_key;
 
@@ -61,30 +58,48 @@ pub async fn auth_middleware(
     // Load partner config from local DB
     let tenant = match state.db.get_tenant_by_partner_id(&partner_id).await {
         Ok(Some(t)) => t,
-        Ok(None) => return Err((
-            StatusCode::FORBIDDEN,
-            axum::Json(json!({"error": "Partner not found in this deployment"})),
-        )),
+        Ok(None) => {
+            return Err((
+                StatusCode::FORBIDDEN,
+                axum::Json(json!({"error": "Partner not found in this deployment"})),
+            ))
+        }
         Err(e) => {
             error!("Tenant DB lookup error: {}", e);
-            return Err((StatusCode::INTERNAL_SERVER_ERROR, axum::Json(json!({"error": "auth service unavailable"}))));
+            return Err((
+                StatusCode::INTERNAL_SERVER_ERROR,
+                axum::Json(json!({"error": "auth service unavailable"})),
+            ));
         }
     };
 
     // Check instance health from Redis (Real-time gate)
-    let health = state.redis.get_instance_health(&tenant.instance_name).await
+    let health = state
+        .redis
+        .get_instance_health(&tenant.instance_name)
+        .await
         .unwrap_or(InstanceHealth::Disconnected);
 
     match health {
-        InstanceHealth::Banned => return Err((StatusCode::FORBIDDEN, axum::Json(json!({"error": "WhatsApp instance is banned"})))),
+        InstanceHealth::Banned => {
+            return Err((
+                StatusCode::FORBIDDEN,
+                axum::Json(json!({"error": "WhatsApp instance is banned"})),
+            ))
+        }
         InstanceHealth::QrRequired => {
             let path = req.uri().path();
-            let is_setup_route = path == "/instance/qr" || path == "/instance/health" || path == "/instance/qr/regenerate";
+            let is_setup_route = path == "/instance/qr"
+                || path == "/instance/health"
+                || path == "/instance/qr/regenerate";
             if !is_setup_route {
-                return Err((StatusCode::CONFLICT, axum::Json(json!({
-                    "error": "WhatsApp instance needs re-authentication (QR scan required)",
-                    "code": "QR_REQUIRED"
-                }))));
+                return Err((
+                    StatusCode::CONFLICT,
+                    axum::Json(json!({
+                        "error": "WhatsApp instance needs re-authentication (QR scan required)",
+                        "code": "QR_REQUIRED"
+                    })),
+                ));
             }
         }
         _ => {}
@@ -92,9 +107,9 @@ pub async fn auth_middleware(
 
     // Build context
     let ctx = TenantContext {
-        tenant_id: tenant.id,   // Local DB primary key
-        partner_id,             // Platform's partner ID
-        owner_id: Uuid::nil(),  // Detailed owner_id removed for simple deployment
+        tenant_id: tenant.id,  // Local DB primary key
+        partner_id,            // Platform's partner ID
+        owner_id: Uuid::nil(), // Detailed owner_id removed for simple deployment
         instance_name: tenant.instance_name.clone(),
         wa_number: tenant.wa_number.unwrap_or_default(),
         plan_tier: PlanTier::Enterprise, // Default to Enterprise for dedicated deployments

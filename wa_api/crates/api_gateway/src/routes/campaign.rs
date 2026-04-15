@@ -69,10 +69,20 @@ async fn start_campaign(
     // Validate tenant exists
     let tenant = match state.db.get_tenant_by_id(&req.tenant_id).await {
         Ok(Some(t)) => t,
-        Ok(None) => return (StatusCode::NOT_FOUND, Json(json!({"error": "Tenant not found"}))).into_response(),
+        Ok(None) => {
+            return (
+                StatusCode::NOT_FOUND,
+                Json(json!({"error": "Tenant not found"})),
+            )
+                .into_response()
+        }
         Err(e) => {
             error!("Tenant lookup error: {}", e);
-            return (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": "DB error"}))).into_response();
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({"error": "DB error"})),
+            )
+                .into_response();
         }
     };
 
@@ -105,7 +115,11 @@ async fn start_campaign(
     }
 
     // Backpressure check
-    if let Ok(len) = state.redis.queue_len_ready(&req.tenant_id.to_string()).await {
+    if let Ok(len) = state
+        .redis
+        .queue_len_ready(&req.tenant_id.to_string())
+        .await
+    {
         if len > 5000 {
             warn!(tenant_id = %req.tenant_id, queue_len = len, "Backpressure triggered");
             return (
@@ -120,11 +134,11 @@ async fn start_campaign(
     }
 
     let campaign_id = Uuid::new_v4();
-    
+
     // Save campaign to DB
     let _ = sqlx::query(
         "INSERT INTO wa_campaigns (id, tenant_id, name, template_name, status, total_recipients) \
-         VALUES ($1, $2, $3, $4, 'running', $5)"
+         VALUES ($1, $2, $3, $4, 'running', $5)",
     )
     .bind(campaign_id)
     .bind(req.tenant_id)
@@ -144,7 +158,11 @@ async fn start_campaign(
     let redis = state.redis.clone();
     let pool_instances = redis.pool_get_available().await.unwrap_or_default();
     if pool_instances.is_empty() {
-        return (StatusCode::SERVICE_UNAVAILABLE, Json(json!({"error": "No pool numbers available"}))).into_response();
+        return (
+            StatusCode::SERVICE_UNAVAILABLE,
+            Json(json!({"error": "No pool numbers available"})),
+        )
+            .into_response();
     }
 
     let scheduled_at = req.scheduled_at.unwrap_or_else(Utc::now);
@@ -153,10 +171,15 @@ async fn start_campaign(
     let mut pool_idx = 0;
 
     for phone in &req.recipients {
-        if !validate_phone(phone) { continue; }
-        
+        if !validate_phone(phone) {
+            continue;
+        }
+
         let phone_hash = shared::utils::hash_phone(phone);
-        let week_count = redis.spam_guard_get_week(&phone_hash).await.unwrap_or_default();
+        let week_count = redis
+            .spam_guard_get_week(&phone_hash)
+            .await
+            .unwrap_or_default();
         if week_count >= spam_guard::WEEKLY_LIMIT {
             spam_dropped += 1;
             continue;
@@ -187,23 +210,39 @@ async fn start_campaign(
         if let Ok(_) = redis.save_job(&job).await {
             let job_id_str = job.job_id.to_string();
             let res = if scheduled_at <= Utc::now() {
-                redis.lpush_ready(&req.tenant_id.to_string(), &job_id_str).await
+                redis
+                    .lpush_ready(&req.tenant_id.to_string(), &job_id_str)
+                    .await
             } else {
-                redis.zadd_scheduled(&req.tenant_id.to_string(), scheduled_at.timestamp() as f64, &job_id_str).await
+                redis
+                    .zadd_scheduled(
+                        &req.tenant_id.to_string(),
+                        scheduled_at.timestamp() as f64,
+                        &job_id_str,
+                    )
+                    .await
             };
-            if res.is_ok() { enqueued += 1; }
+            if res.is_ok() {
+                enqueued += 1;
+            }
         }
     }
 
-    let _ = redis.campaigns_add_active(&campaign_id.to_string(), Utc::now().timestamp() as f64).await;
+    let _ = redis
+        .campaigns_add_active(&campaign_id.to_string(), Utc::now().timestamp() as f64)
+        .await;
 
-    (StatusCode::ACCEPTED, Json(json!({
-        "campaign_id": campaign_id,
-        "status": "running",
-        "total": req.recipients.len(),
-        "enqueued": enqueued,
-        "spam_dropped": spam_dropped
-    }))).into_response()
+    (
+        StatusCode::ACCEPTED,
+        Json(json!({
+            "campaign_id": campaign_id,
+            "status": "running",
+            "total": req.recipients.len(),
+            "enqueued": enqueued,
+            "spam_dropped": spam_dropped
+        })),
+    )
+        .into_response()
 }
 
 /// POST /admin/campaign/pause/:id
@@ -214,23 +253,43 @@ async fn pause_campaign(
 ) -> impl IntoResponse {
     let tenant_id = match params.tenant_id {
         Some(id) => id,
-        None => return (StatusCode::BAD_REQUEST, Json(json!({"error": "tenant_id query param required"}))).into_response(),
+        None => {
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(json!({"error": "tenant_id query param required"})),
+            )
+                .into_response()
+        }
     };
     let tenant_id_str = tenant_id.to_string();
     let campaign_id_str = campaign_id.to_string();
 
-    match state.redis.move_jobs_to_paused(&tenant_id_str, &campaign_id_str).await {
+    match state
+        .redis
+        .move_jobs_to_paused(&tenant_id_str, &campaign_id_str)
+        .await
+    {
         Ok(count) => {
-            let _ = sqlx::query("UPDATE wa_campaigns SET status = 'paused' WHERE id = $1 AND tenant_id = $2")
-                .bind(campaign_id)
-                .bind(tenant_id)
-                .execute(state.db.pool())
-                .await;
-            
+            let _ = sqlx::query(
+                "UPDATE wa_campaigns SET status = 'paused' WHERE id = $1 AND tenant_id = $2",
+            )
+            .bind(campaign_id)
+            .bind(tenant_id)
+            .execute(state.db.pool())
+            .await;
+
             info!(campaign_id = %campaign_id, moved = count, "Campaign paused");
-            (StatusCode::OK, Json(json!({"status": "paused", "moved_to_paused": count}))).into_response()
+            (
+                StatusCode::OK,
+                Json(json!({"status": "paused", "moved_to_paused": count})),
+            )
+                .into_response()
         }
-        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": e.to_string()}))).into_response()
+        Err(e) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({"error": e.to_string()})),
+        )
+            .into_response(),
     }
 }
 
@@ -242,31 +301,55 @@ async fn resume_campaign(
 ) -> impl IntoResponse {
     let tenant_id = match params.tenant_id {
         Some(id) => id,
-        None => return (StatusCode::BAD_REQUEST, Json(json!({"error": "tenant_id query param required"}))).into_response(),
+        None => {
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(json!({"error": "tenant_id query param required"})),
+            )
+                .into_response()
+        }
     };
 
     // Backpressure check
     if let Ok(len) = state.redis.queue_len_ready(&tenant_id.to_string()).await {
         if len > 5000 {
-            return (StatusCode::TOO_MANY_REQUESTS, Json(json!({"error": "Queue overloaded, cannot resume yet"}))).into_response();
+            return (
+                StatusCode::TOO_MANY_REQUESTS,
+                Json(json!({"error": "Queue overloaded, cannot resume yet"})),
+            )
+                .into_response();
         }
     }
 
     let tenant_id_str = tenant_id.to_string();
     let campaign_id_str = campaign_id.to_string();
 
-    match state.redis.move_jobs_to_ready(&tenant_id_str, &campaign_id_str).await {
+    match state
+        .redis
+        .move_jobs_to_ready(&tenant_id_str, &campaign_id_str)
+        .await
+    {
         Ok(count) => {
-            let _ = sqlx::query("UPDATE wa_campaigns SET status = 'running' WHERE id = $1 AND tenant_id = $2")
-                .bind(campaign_id)
-                .bind(tenant_id)
-                .execute(state.db.pool())
-                .await;
-            
+            let _ = sqlx::query(
+                "UPDATE wa_campaigns SET status = 'running' WHERE id = $1 AND tenant_id = $2",
+            )
+            .bind(campaign_id)
+            .bind(tenant_id)
+            .execute(state.db.pool())
+            .await;
+
             info!(campaign_id = %campaign_id, moved = count, "Campaign resumed");
-            (StatusCode::OK, Json(json!({"status": "running", "moved_to_ready": count}))).into_response()
+            (
+                StatusCode::OK,
+                Json(json!({"status": "running", "moved_to_ready": count})),
+            )
+                .into_response()
         }
-        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": e.to_string()}))).into_response()
+        Err(e) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({"error": e.to_string()})),
+        )
+            .into_response(),
     }
 }
 
@@ -278,25 +361,45 @@ async fn cancel_campaign(
 ) -> impl IntoResponse {
     let tenant_id = match params.tenant_id {
         Some(id) => id,
-        None => return (StatusCode::BAD_REQUEST, Json(json!({"error": "tenant_id query param required"}))).into_response(),
+        None => {
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(json!({"error": "tenant_id query param required"})),
+            )
+                .into_response()
+        }
     };
     let tenant_id_str = tenant_id.to_string();
     let campaign_id_str = campaign_id.to_string();
 
-    match state.redis.purge_campaign_jobs(&tenant_id_str, &campaign_id_str).await {
+    match state
+        .redis
+        .purge_campaign_jobs(&tenant_id_str, &campaign_id_str)
+        .await
+    {
         Ok(count) => {
-            let _ = sqlx::query("UPDATE wa_campaigns SET status = 'cancelled' WHERE id = $1 AND tenant_id = $2")
-                .bind(campaign_id)
-                .bind(tenant_id)
-                .execute(state.db.pool())
-                .await;
-            
+            let _ = sqlx::query(
+                "UPDATE wa_campaigns SET status = 'cancelled' WHERE id = $1 AND tenant_id = $2",
+            )
+            .bind(campaign_id)
+            .bind(tenant_id)
+            .execute(state.db.pool())
+            .await;
+
             let _ = state.redis.campaigns_remove_active(&campaign_id_str).await;
-            
+
             info!(campaign_id = %campaign_id, purged = count, "Campaign cancelled");
-            (StatusCode::OK, Json(json!({"status": "cancelled", "purged": count}))).into_response()
+            (
+                StatusCode::OK,
+                Json(json!({"status": "cancelled", "purged": count})),
+            )
+                .into_response()
         }
-        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": e.to_string()}))).into_response()
+        Err(e) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({"error": e.to_string()})),
+        )
+            .into_response(),
     }
 }
 
@@ -330,7 +433,11 @@ async fn campaign_status(
 
     match row {
         Ok(Some(r)) => (StatusCode::OK, Json(json!(r))).into_response(),
-        _ => (StatusCode::NOT_FOUND, Json(json!({"error": "Campaign not found"}))).into_response(),
+        _ => (
+            StatusCode::NOT_FOUND,
+            Json(json!({"error": "Campaign not found"})),
+        )
+            .into_response(),
     }
 }
 
@@ -365,7 +472,11 @@ async fn list_campaigns(
     .await
     {
         Ok(rows) => (StatusCode::OK, Json(json!({"campaigns": rows}))).into_response(),
-        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": e.to_string()}))).into_response()
+        Err(e) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({"error": e.to_string()})),
+        )
+            .into_response(),
     }
 }
 

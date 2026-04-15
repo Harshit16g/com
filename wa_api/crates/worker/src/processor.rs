@@ -123,7 +123,10 @@ async fn process_job(worker_id: usize, job: WhatsAppJob, state: Arc<AppState>) {
     // ── Step 4: Spam guard double-check (R6: Atomic) ──────────────────────
     let phone_hash = hash_phone(&job.recipient_phone);
     let ttl = seconds_until_ist_midnight();
-    let allowed = redis.spam_guard_check_and_incr(&phone_hash, 5, ttl).await.unwrap_or(false);
+    let allowed = redis
+        .spam_guard_check_and_incr(&phone_hash, 5, ttl)
+        .await
+        .unwrap_or(false);
     if !allowed {
         warn!(job_id = %job_id, "Spam guard blocked at worker — deferring");
         defer_to_tomorrow(&redis, &job).await;
@@ -184,8 +187,9 @@ async fn process_job(worker_id: usize, job: WhatsAppJob, state: Arc<AppState>) {
 
     let send_result = tokio::time::timeout(
         Duration::from_secs(25),
-        state.evo.send_text(instance, &job.recipient_phone, &text)
-    ).await;
+        state.evo.send_text(instance, &job.recipient_phone, &text),
+    )
+    .await;
 
     // Stop heartbeat task
     heartbeat_handle.abort();
@@ -214,7 +218,10 @@ async fn process_job(worker_id: usize, job: WhatsAppJob, state: Arc<AppState>) {
 
             // R10: Atomic campaign counter increment
             if let Some(campaign_id) = job.campaign_id {
-                let _ = state.db.increment_campaign_counters(&campaign_id, 1, 0, 0).await;
+                let _ = state
+                    .db
+                    .increment_campaign_counters(&campaign_id, 1, 0, 0)
+                    .await;
             }
         }
 

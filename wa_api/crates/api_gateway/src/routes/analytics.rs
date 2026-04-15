@@ -122,8 +122,9 @@ async fn messages_analytics(
     match (rows, summary) {
         (Ok(raw_messages), Ok(s)) => {
             // Mask phone numbers before returning to client
-            let messages: Vec<InteractionRow> = raw_messages.into_iter().map(|r| {
-                InteractionRow {
+            let messages: Vec<InteractionRow> = raw_messages
+                .into_iter()
+                .map(|r| InteractionRow {
                     id: r.id,
                     campaign_id: r.campaign_id,
                     message_type: r.message_type,
@@ -137,8 +138,8 @@ async fn messages_analytics(
                     sent_at: r.sent_at,
                     delivered_at: r.delivered_at,
                     created_at: r.created_at,
-                }
-            }).collect();
+                })
+                .collect();
 
             let s_ref = s.as_ref();
             let sent = s_ref.map(|d| d.sent_today).unwrap_or(0);

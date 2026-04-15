@@ -30,10 +30,7 @@ pub async fn start(state: Arc<AppState>) -> Result<()> {
                 Ok(_) => {
                     info!("ACK SUCCESS — Connection to Evolution API is stable")
                 }
-                Err(e) => error!(
-                    "ACK FAIL — Connection to Evolution API lost: {}",
-                    e
-                ),
+                Err(e) => error!("ACK FAIL — Connection to Evolution API lost: {}", e),
             }
             last_ping = std::time::Instant::now();
         }
@@ -60,7 +57,9 @@ pub async fn start(state: Arc<AppState>) -> Result<()> {
 
 /// Check if an instance name is managed by this wa_api deployment.
 fn is_managed_instance(name: &str) -> bool {
-    MANAGED_PREFIXES.iter().any(|prefix| name.starts_with(prefix))
+    MANAGED_PREFIXES
+        .iter()
+        .any(|prefix| name.starts_with(prefix))
 }
 
 /// R3 watchdog: Recover jobs stuck in jobs:processing: worker lists.
@@ -71,7 +70,11 @@ async fn recover_stuck_processing_jobs(redis: &RedisClient) -> Result<()> {
         return Ok(());
     }
 
-    info!(count = lists.len(), "Checking {} worker processing lists for stuck jobs", lists.len());
+    info!(
+        count = lists.len(),
+        "Checking {} worker processing lists for stuck jobs",
+        lists.len()
+    );
 
     for list_key in lists {
         // In a real implementation, we might want to check the age of the job.

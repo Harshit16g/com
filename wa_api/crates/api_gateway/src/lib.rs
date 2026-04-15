@@ -42,12 +42,13 @@ pub async fn start_server(state: Arc<AppState>) -> Result<()> {
         ));
 
     // Webhook routes — authenticated via x-webhook-secret from evo API instances
-    let webhook_routes = Router::new()
-        .merge(routes::webhook::router())
-        .route_layer(middleware::from_fn_with_state(
-            Arc::clone(&state),
-            auth::webhook_auth_middleware,
-        ));
+    let webhook_routes =
+        Router::new()
+            .merge(routes::webhook::router())
+            .route_layer(middleware::from_fn_with_state(
+                Arc::clone(&state),
+                auth::webhook_auth_middleware,
+            ));
 
     // Health route (unauthenticated — used by load balancers)
     let health_route = Router::new().route("/health", axum::routing::get(|| async { "OK" }));
@@ -84,10 +85,7 @@ fn build_cors_layer(origins: &[String]) -> CorsLayer {
             .allow_methods(AllowMethods::any())
             .allow_headers(AllowHeaders::any())
     } else {
-        let parsed: Vec<_> = origins
-            .iter()
-            .filter_map(|o| o.parse().ok())
-            .collect();
+        let parsed: Vec<_> = origins.iter().filter_map(|o| o.parse().ok()).collect();
         CorsLayer::new()
             .allow_origin(AllowOrigin::list(parsed))
             .allow_methods(AllowMethods::any())

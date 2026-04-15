@@ -151,18 +151,17 @@ impl RedisClient {
     }
 
     /// R3: Reliable pop using LMOVE to move job to a processing list.
-    pub async fn reliable_pop(
-        &self,
-        tenant_id: &str,
-        worker_id: usize,
-    ) -> Result<Option<String>> {
+    pub async fn reliable_pop(&self, tenant_id: &str, worker_id: usize) -> Result<Option<String>> {
         let source = format!("jobs:ready:{}", tenant_id);
         let dest = format!("jobs:processing:{}", worker_id);
 
-        let job_id: Option<String> = self.pool.custom(
-            fred::types::CustomCommand::new_static("LMOVE", None, false),
-            vec![source, dest, "RIGHT".to_string(), "LEFT".to_string()]
-        ).await?;
+        let job_id: Option<String> = self
+            .pool
+            .custom(
+                fred::types::CustomCommand::new_static("LMOVE", None, false),
+                vec![source, dest, "RIGHT".to_string(), "LEFT".to_string()],
+            )
+            .await?;
 
         Ok(job_id)
     }
@@ -227,16 +226,19 @@ impl RedisClient {
         "#;
 
         // Using custom command for EVAL to avoid trait/type issues
-        let moved_count: usize = self.pool.custom(
-            fred::types::CustomCommand::new_static("EVAL", None, false),
-            vec![
-                script.to_string(),
-                "2".to_string(),
-                scheduled_key,
-                ready_key,
-                now.to_string(),
-            ]
-        ).await?;
+        let moved_count: usize = self
+            .pool
+            .custom(
+                fred::types::CustomCommand::new_static("EVAL", None, false),
+                vec![
+                    script.to_string(),
+                    "2".to_string(),
+                    scheduled_key,
+                    ready_key,
+                    now.to_string(),
+                ],
+            )
+            .await?;
 
         Ok(moved_count)
     }
@@ -273,16 +275,19 @@ impl RedisClient {
             return moved
         "#;
 
-        let moved_count: usize = self.pool.custom(
-            fred::types::CustomCommand::new_static("EVAL", None, false),
-            vec![
-                script.to_string(),
-                "2".to_string(),
-                ready_key,
-                paused_key,
-                campaign_id.to_string(),
-            ]
-        ).await?;
+        let moved_count: usize = self
+            .pool
+            .custom(
+                fred::types::CustomCommand::new_static("EVAL", None, false),
+                vec![
+                    script.to_string(),
+                    "2".to_string(),
+                    ready_key,
+                    paused_key,
+                    campaign_id.to_string(),
+                ],
+            )
+            .await?;
 
         Ok(moved_count)
     }
@@ -305,15 +310,13 @@ impl RedisClient {
             return moved
         "#;
 
-        let moved_count: usize = self.pool.custom(
-            fred::types::CustomCommand::new_static("EVAL", None, false),
-            vec![
-                script.to_string(),
-                "2".to_string(),
-                ready_key,
-                paused_key,
-            ]
-        ).await?;
+        let moved_count: usize = self
+            .pool
+            .custom(
+                fred::types::CustomCommand::new_static("EVAL", None, false),
+                vec![script.to_string(), "2".to_string(), ready_key, paused_key],
+            )
+            .await?;
 
         Ok(moved_count)
     }
@@ -348,16 +351,19 @@ impl RedisClient {
             return purged
         "#;
 
-        let purged_count: usize = self.pool.custom(
-            fred::types::CustomCommand::new_static("EVAL", None, false),
-            vec![
-                script.to_string(),
-                "2".to_string(),
-                ready_key,
-                paused_key,
-                campaign_id.to_string(),
-            ]
-        ).await?;
+        let purged_count: usize = self
+            .pool
+            .custom(
+                fred::types::CustomCommand::new_static("EVAL", None, false),
+                vec![
+                    script.to_string(),
+                    "2".to_string(),
+                    ready_key,
+                    paused_key,
+                    campaign_id.to_string(),
+                ],
+            )
+            .await?;
 
         Ok(purged_count)
     }
@@ -498,16 +504,19 @@ impl RedisClient {
             return 1  -- allowed
         "#;
 
-        let result: i32 = self.pool.custom(
-            fred::types::CustomCommand::new_static("EVAL", None, false),
-            vec![
-                script.to_string(),
-                "1".to_string(),
-                key,
-                limit.to_string(),
-                ttl_secs.to_string(),
-            ]
-        ).await?;
+        let result: i32 = self
+            .pool
+            .custom(
+                fred::types::CustomCommand::new_static("EVAL", None, false),
+                vec![
+                    script.to_string(),
+                    "1".to_string(),
+                    key,
+                    limit.to_string(),
+                    ttl_secs.to_string(),
+                ],
+            )
+            .await?;
 
         Ok(result == 1)
     }

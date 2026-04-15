@@ -44,7 +44,7 @@ pub fn hash_id(id: &Uuid) -> String {
 pub fn mask_phone(phone: &str) -> String {
     let len = phone.len();
     if len >= 8 {
-        let prefix = &phone[..3];   // e.g. "+91" or "+44"
+        let prefix = &phone[..3]; // e.g. "+91" or "+44"
         let last4 = &phone[len - 4..];
         format!("{} XXXXX X{}", prefix, last4)
     } else if len >= 4 {

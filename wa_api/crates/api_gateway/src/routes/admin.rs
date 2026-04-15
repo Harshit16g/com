@@ -11,8 +11,8 @@ use std::sync::Arc;
 use tracing::{error, info};
 use uuid::Uuid;
 
+use pool_manager::{get_all_pool_instances, register_pool_number};
 use shared::state::AppState;
-use pool_manager::{register_pool_number, get_all_pool_instances};
 
 // ─── GET /admin/instances ─────────────────────────────────────────────────────
 
@@ -97,14 +97,22 @@ async fn admin_add_pool_number(
             if let Err(e) = register_pool_number(&state.redis, &instance_name).await {
                 error!(instance = %instance_name, "Failed to register pool number in Redis: {}", e);
                 let err_msg = e.to_string();
-                return (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({ "error": err_msg }))).into_response();
+                return (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    Json(json!({ "error": err_msg })),
+                )
+                    .into_response();
             }
-            
-            (StatusCode::CREATED, Json(json!({
-                "status": "SUCCESS",
-                "instance_name": instance_name,
-                "message": "Pool instance provisioned. Scan QR to activate."
-            }))).into_response()
+
+            (
+                StatusCode::CREATED,
+                Json(json!({
+                    "status": "SUCCESS",
+                    "instance_name": instance_name,
+                    "message": "Pool instance provisioned. Scan QR to activate."
+                })),
+            )
+                .into_response()
         }
         Err(e) => {
             error!(instance = %instance_name, "Failed to provision pool instance in Evo: {}", e);
@@ -121,16 +129,23 @@ async fn admin_list_pool(State(state): State<Arc<AppState>>) -> impl IntoRespons
         Ok(m) => m,
         Err(e) => {
             let err_msg = e.to_string();
-            return (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": err_msg}))).into_response();
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({"error": err_msg})),
+            )
+                .into_response();
         }
     };
 
     let mut results = Vec::new();
     for p in pool_members {
-        let health = state.redis.get_instance_health(&p.name).await
+        let health = state
+            .redis
+            .get_instance_health(&p.name)
+            .await
             .map(|h| h.to_string())
             .unwrap_or_else(|_| "UNKNOWN".into());
-        
+
         results.push(json!({
             "instance_name": p.name,
             "state": p.state,
@@ -194,9 +209,7 @@ struct CreateInstanceRequest {
 fn is_valid_instance_name(name: &str) -> bool {
     !name.is_empty()
         && name.len() <= 64
-        && name
-            .chars()
-            .all(|c| c.is_ascii_alphanumeric() || c == '_')
+        && name.chars().all(|c| c.is_ascii_alphanumeric() || c == '_')
 }
 
 #[derive(Debug, Deserialize)]
@@ -225,7 +238,11 @@ async fn admin_update_tenant_limits(
     }
 
     if updates.is_empty() {
-        return (StatusCode::BAD_REQUEST, Json(json!({"error": "No fields to update"}))).into_response();
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(json!({"error": "No fields to update"})),
+        )
+            .into_response();
     }
 
     let sql = format!(
@@ -244,17 +261,29 @@ async fn admin_update_tenant_limits(
     match query.execute(state.db.pool()).await {
         Ok(result) if result.rows_affected() > 0 => {
             info!(tenant_id = %req.tenant_id, "Tenant limits updated");
-            (StatusCode::OK, Json(json!({
-                "status": "updated",
-                "tenant_id": req.tenant_id,
-                "daily_crm_limit": req.daily_crm_limit,
-                "campaign_enabled": req.campaign_enabled,
-            }))).into_response()
+            (
+                StatusCode::OK,
+                Json(json!({
+                    "status": "updated",
+                    "tenant_id": req.tenant_id,
+                    "daily_crm_limit": req.daily_crm_limit,
+                    "campaign_enabled": req.campaign_enabled,
+                })),
+            )
+                .into_response()
         }
-        Ok(_) => (StatusCode::NOT_FOUND, Json(json!({"error": "Tenant not found"}))).into_response(),
+        Ok(_) => (
+            StatusCode::NOT_FOUND,
+            Json(json!({"error": "Tenant not found"})),
+        )
+            .into_response(),
         Err(e) => {
             error!("Failed to update tenant limits: {}", e);
-            (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": "Database error"}))).into_response()
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({"error": "Database error"})),
+            )
+                .into_response()
         }
     }
 }
@@ -279,7 +308,7 @@ async fn admin_create_instance(
     let insert_result = sqlx::query(
         "INSERT INTO tenants \
          (id, partner_id, instance_name, instance_status, daily_crm_limit, campaign_enabled) \
-         VALUES ($1, $2, $3, 'disconnected', $4, $5)"
+         VALUES ($1, $2, $3, 'disconnected', $4, $5)",
     )
     .bind(tenant_id)
     .bind(req.partner_id)
@@ -343,13 +372,20 @@ async fn admin_create_instance(
                 Err(e) => {
                     tracing::error!("CRITICAL: Phase 3 update failed: {}", e);
                     let err_msg = e.to_string();
-                    (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({ "error": err_msg }))).into_response()
+                    (
+                        StatusCode::INTERNAL_SERVER_ERROR,
+                        Json(json!({ "error": err_msg })),
+                    )
+                        .into_response()
                 }
             }
         }
         Err(e) => {
             // 4. Compensation: Rollback the DB reservation
-            tracing::error!("evo create_instance failed (Phase 2): {}. Rolling back DB reservation.", e);
+            tracing::error!(
+                "evo create_instance failed (Phase 2): {}. Rolling back DB reservation.",
+                e
+            );
             let _ = sqlx::query("DELETE FROM tenants WHERE id = $1")
                 .bind(tenant_id)
                 .execute(state.db.pool())
@@ -378,19 +414,27 @@ async fn admin_force_qr(
     Json(req): Json<AdminForceQrRequest>,
 ) -> impl IntoResponse {
     // 1. Validate tenant exists and matches instance_name
-    let _tenant = match state.db.get_tenant_by_instance_name(&req.instance_name).await {
+    let _tenant = match state
+        .db
+        .get_tenant_by_instance_name(&req.instance_name)
+        .await
+    {
         Ok(Some(t)) if t.id == req.tenant_id => t,
-        _ => return (
-            StatusCode::NOT_FOUND,
-            Json(json!({"error": "Tenant not found or instance_name mismatch"}))
-        ).into_response(),
+        _ => {
+            return (
+                StatusCode::NOT_FOUND,
+                Json(json!({"error": "Tenant not found or instance_name mismatch"})),
+            )
+                .into_response()
+        }
     };
 
     if req.reason.trim().is_empty() {
         return (
             StatusCode::BAD_REQUEST,
-            Json(json!({"error": "reason is required for admin force-qr"}))
-        ).into_response();
+            Json(json!({"error": "reason is required for admin force-qr"})),
+        )
+            .into_response();
     }
 
     // 2. Audit Log
@@ -402,15 +446,18 @@ async fn admin_force_qr(
         "Admin initiated forced QR regeneration"
     );
 
-    let _ = state.db.log_instance_health_event(
-        &req.instance_name,
-        Some(&req.tenant_id),
-        false,
-        "admin_force_qr",
-        "N/A",
-        "QR_REQUIRED",
-        Some(json!({ "reason": req.reason, "triggered_by": "admin_api" })),
-    ).await;
+    let _ = state
+        .db
+        .log_instance_health_event(
+            &req.instance_name,
+            Some(&req.tenant_id),
+            false,
+            "admin_force_qr",
+            "N/A",
+            "QR_REQUIRED",
+            Some(json!({ "reason": req.reason, "triggered_by": "admin_api" })),
+        )
+        .await;
 
     // 3. Call evo API
     match state.evo.get_instance_qr(&req.instance_name).await {
@@ -433,7 +480,10 @@ pub fn router() -> Router<Arc<AppState>> {
         .route("/admin/instances", get(admin_list_instances))
         .route("/admin/instance/create", post(admin_create_instance))
         .route("/admin/instance/force-qr", post(admin_force_qr))
-        .route("/admin/tenant/update-limits", post(admin_update_tenant_limits))
+        .route(
+            "/admin/tenant/update-limits",
+            post(admin_update_tenant_limits),
+        )
         .route("/admin/pool", get(admin_list_pool))
         .route("/admin/pool/add", post(admin_add_pool_number))
 }

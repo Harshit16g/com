@@ -3,7 +3,7 @@ use serde::Deserialize;
 use serde_json::json;
 use shared::utils::hash_phone;
 use std::sync::Arc;
-use tracing::{info, error};
+use tracing::{error, info};
 
 use shared::state::AppState;
 
@@ -60,13 +60,17 @@ async fn evo_webhook(
                     {
                         // R10: Atomic counter increment via RPC
                         let (delivered, failed) = match delivery_status {
-                            shared::types::JobStatus::Delivered | shared::types::JobStatus::Read => (1, 0),
+                            shared::types::JobStatus::Delivered
+                            | shared::types::JobStatus::Read => (1, 0),
                             shared::types::JobStatus::Failed => (0, 1),
                             _ => (0, 0),
                         };
 
                         if delivered > 0 || failed > 0 {
-                            let _ = state.db.increment_campaign_counters(&campaign_id, 0, delivered, failed).await;
+                            let _ = state
+                                .db
+                                .increment_campaign_counters(&campaign_id, 0, delivered, failed)
+                                .await;
                         }
                     }
                 }
@@ -330,7 +334,12 @@ async fn evo_webhook(
 }
 
 /// Notify the main platform (Leaex v2) of status changes.
-async fn sync_to_platform(state: &AppState, partner_id: uuid::Uuid, instance_name: &str, status: &str) {
+async fn sync_to_platform(
+    state: &AppState,
+    partner_id: uuid::Uuid,
+    instance_name: &str,
+    status: &str,
+) {
     let url = match &state.config.platform_webhook_url {
         Some(u) => u,
         None => return,
