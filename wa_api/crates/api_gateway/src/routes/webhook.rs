@@ -1,4 +1,10 @@
-use axum::{extract::State, http::StatusCode, response::IntoResponse, routing::{get, post}, Json, Router};
+use axum::{
+    extract::State,
+    http::StatusCode,
+    response::IntoResponse,
+    routing::{get, post},
+    Json, Router,
+};
 use serde::Deserialize;
 use serde_json::json;
 use shared::utils::hash_phone;
@@ -374,6 +380,12 @@ async fn sync_to_platform(
 
 pub fn router() -> Router<Arc<AppState>> {
     Router::new()
-        .route("/webhook/evo", post(evo_webhook).get(|| async { "Webhook endpoint is alive. Use POST to send data." }))
-        .route("/webhook/evo/:action", post(evo_webhook).get(|| async { "Webhook endpoint is alive. Use POST to send data." }))
+        .route(
+            "/webhook/evo",
+            post(evo_webhook).get(|| async { "Webhook endpoint is alive. Use POST to send data." }),
+        )
+        .route(
+            "/webhook/evo/:action",
+            post(evo_webhook).get(|| async { "Webhook endpoint is alive. Use POST to send data." }),
+        )
 }
