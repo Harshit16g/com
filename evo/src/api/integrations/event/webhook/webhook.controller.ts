@@ -169,8 +169,14 @@ export class WebhookController extends EventController implements EventControlle
 
         try {
           if (regex.test(globalURL)) {
+            const globalHeaders: Record<string, string> = {};
+            if (webhookConfig.GLOBAL.SHARED_SECRET) {
+              globalHeaders['x-webhook-secret'] = webhookConfig.GLOBAL.SHARED_SECRET;
+            }
+
             const httpService = axios.create({
               baseURL: globalURL,
+              headers: globalHeaders,
               timeout: webhookConfig.REQUEST?.TIMEOUT_MS ?? 30000,
             });
 

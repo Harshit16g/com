@@ -373,5 +373,7 @@ async fn sync_to_platform(
 }
 
 pub fn router() -> Router<Arc<AppState>> {
-    Router::new().route("/webhook/evo", post(evo_webhook))
+    Router::new()
+        .route("/webhook/evo", post(evo_webhook))
+        .route("/webhook/evo/:action", post(evo_webhook))
 }

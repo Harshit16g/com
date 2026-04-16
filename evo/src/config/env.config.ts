@@ -273,6 +273,7 @@ export type GlobalWebhook = {
   URL: string;
   ENABLED: boolean;
   WEBHOOK_BY_EVENTS: boolean;
+  SHARED_SECRET: string;
 };
 
 export type GlobalPusher = {
@@ -749,6 +750,7 @@ export class ConfigService {
           URL: process.env?.WEBHOOK_GLOBAL_URL || '',
           ENABLED: process.env?.WEBHOOK_GLOBAL_ENABLED === 'true',
           WEBHOOK_BY_EVENTS: process.env?.WEBHOOK_GLOBAL_WEBHOOK_BY_EVENTS === 'true',
+          SHARED_SECRET: process.env?.WEBHOOK_SHARED_SECRET || '',
         },
         EVENTS: {
           APPLICATION_STARTUP: process.env?.WEBHOOK_EVENTS_APPLICATION_STARTUP === 'true',
