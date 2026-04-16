@@ -486,14 +486,14 @@ async fn list_campaigns(
 pub fn partner_router() -> Router<Arc<AppState>> {
     Router::new()
         .route("/campaigns", get(list_campaigns))
-        .route("/campaign/status/{id}", get(campaign_status))
+        .route("/campaign/status/:id", get(campaign_status))
 }
 
 /// Admin-facing campaign write routes (require x-admin-key)
 pub fn admin_router() -> Router<Arc<AppState>> {
     Router::new()
         .route("/admin/campaign/start", post(start_campaign))
-        .route("/admin/campaign/pause/{id}", post(pause_campaign))
-        .route("/admin/campaign/resume/{id}", post(resume_campaign))
-        .route("/admin/campaign/cancel/{id}", post(cancel_campaign))
+        .route("/admin/campaign/pause/:id", post(pause_campaign))
+        .route("/admin/campaign/resume/:id", post(resume_campaign))
+        .route("/admin/campaign/cancel/:id", post(cancel_campaign))
 }
