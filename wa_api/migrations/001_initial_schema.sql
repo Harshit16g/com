@@ -55,29 +55,6 @@ CREATE TABLE IF NOT EXISTS wa_interaction_log (
     tenant_id               UUID NOT NULL REFERENCES tenants(id),
     campaign_id             UUID REFERENCES wa_campaigns(id),
 
-    -- Direction: who initiated the interaction
-    direction               TEXT NOT NULL DEFAULT 'outbound'
-                                CHECK (direction IN ('inbound', 'outbound')),
-
-    -- Message type: specific automation/trigger type
-    message_type            TEXT NOT NULL
-                                CHECK (message_type IN (
-                                    -- Outbound types
-                                    'campaign', 'booking_confirm', 'reminder', 'birthday',
-                                    'anniversary', 'manual_crm', 're_engagement',
-                                    -- Inbound types
-                                    'inbound',
-                                    -- General
-                                    'outbound', 'feedback', 'complaint'
-                                )),
-
-    -- Intent: business purpose of the interaction (nullable for legacy data)
-    intent                  TEXT
-                                CHECK (intent IS NULL OR intent IN (
-                                    'support', 'sales', 'marketing', 'feedback',
-                                    'transactional', 're_engagement', 'general'
-                                )),
-
     recipient_phone_hash    TEXT NOT NULL,   -- sha256(phone), for analytics/joins
     recipient_phone         TEXT NOT NULL,   -- Full PII number (to be migrated to Supabase)
     recipient_name          TEXT,            -- Full customer name
@@ -87,6 +64,7 @@ CREATE TABLE IF NOT EXISTS wa_interaction_log (
                                     'pending', 'sent', 'delivered', 'read', 'failed',
                                     'deferred_spam', 'blocked_optout', 'duplicate', 'expired_dlq'
                                 )),
+    message_type            TEXT NOT NULL,
     evo_msg_id              TEXT,
     error_reason            TEXT,
     retry_count             SMALLINT NOT NULL DEFAULT 0,
@@ -96,6 +74,25 @@ CREATE TABLE IF NOT EXISTS wa_interaction_log (
     idempotency_key         TEXT UNIQUE NOT NULL,
     created_at              TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+-- Ensure v3.1 columns exist if table was created in v3.0
+ALTER TABLE wa_interaction_log ADD COLUMN IF NOT EXISTS direction TEXT NOT NULL DEFAULT 'outbound';
+ALTER TABLE wa_interaction_log ADD COLUMN IF NOT EXISTS intent TEXT;
+
+-- Update constraints for v3.1
+ALTER TABLE wa_interaction_log DROP CONSTRAINT IF EXISTS wa_interaction_log_direction_check;
+ALTER TABLE wa_interaction_log ADD CONSTRAINT wa_interaction_log_direction_check CHECK (direction IN ('inbound', 'outbound'));
+
+ALTER TABLE wa_interaction_log DROP CONSTRAINT IF EXISTS wa_interaction_log_intent_check;
+ALTER TABLE wa_interaction_log ADD CONSTRAINT wa_interaction_log_intent_check CHECK (intent IS NULL OR intent IN (
+    'support', 'sales', 'marketing', 'feedback', 'transactional', 're_engagement', 'general'
+));
+
+ALTER TABLE wa_interaction_log DROP CONSTRAINT IF EXISTS wa_interaction_log_message_type_check;
+ALTER TABLE wa_interaction_log ADD CONSTRAINT wa_interaction_log_message_type_check CHECK (message_type IN (
+    'campaign', 'booking_confirm', 'reminder', 'birthday', 'anniversary', 'manual_crm', 're_engagement',
+    'inbound', 'outbound', 'feedback', 'complaint'
+));
 CREATE INDEX IF NOT EXISTS idx_interaction_tenant    ON wa_interaction_log(tenant_id);
 CREATE INDEX IF NOT EXISTS idx_interaction_campaign  ON wa_interaction_log(campaign_id);
 CREATE INDEX IF NOT EXISTS idx_interaction_status    ON wa_interaction_log(status);
