@@ -80,8 +80,8 @@ impl DbClient {
             .map_err(|e| anyhow!("Failed to connect to Postgres: {}", e))?;
 
         // 2. Automatically run migrations on startup
-        // Path is relative to crates/shared/src/
-        sqlx::migrate!("../../../migrations")
+        // Path is relative to the crate root (crates/shared/)
+        sqlx::migrate!("../../migrations")
             .run(&pool)
             .await
             .map_err(|e| anyhow!("Failed to run database migrations: {}", e))?;
