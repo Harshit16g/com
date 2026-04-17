@@ -31,7 +31,7 @@ pub async fn start_server(state: Arc<AppState>) -> Result<()> {
             auth::auth_middleware,
         ));
 
-    // Admin routes (x-admin-key)
+    // Admin routes (wa_api-admin-key)
     // Admin can: manage instances, start/pause/cancel campaigns, update tenant limits
     let admin_routes = Router::new()
         .merge(routes::admin::router())
