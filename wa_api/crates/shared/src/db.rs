@@ -1,6 +1,6 @@
 use anyhow::{anyhow, Result};
 use serde::{Deserialize, Serialize};
-use sqlx::PgPool;
+use sqlx::{postgres::PgPoolOptions, PgPool};
 use uuid::Uuid;
 
 /// Direct Postgres client (bundled DB, no PostgREST layer).
@@ -72,9 +72,20 @@ pub struct ContactRow {
 
 impl DbClient {
     pub async fn new(database_url: &str) -> Result<Self> {
-        let pool = PgPool::connect(database_url)
+        // 1. Initialize pool with conservative connection limits for Railway
+        let pool = PgPoolOptions::new()
+            .max_connections(5)
+            .connect(database_url)
             .await
             .map_err(|e| anyhow!("Failed to connect to Postgres: {}", e))?;
+
+        // 2. Automatically run migrations on startup
+        // Path is relative to crates/shared/src/
+        sqlx::migrate!("../../../migrations")
+            .run(&pool)
+            .await
+            .map_err(|e| anyhow!("Failed to run database migrations: {}", e))?;
+
         Ok(DbClient { pool })
     }
 
