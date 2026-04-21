@@ -80,7 +80,7 @@ pub async fn auth_middleware(
                 .as_ref()
                 .and_then(|m| m.role.as_deref())
         })
-        .or_else(|| claims.role.as_deref())
+        .or(claims.role.as_deref())
         .unwrap_or("");
 
     let is_admin = user_role == "admin" || user_role == "core_admin" || user_role == "super_admin";
@@ -224,7 +224,7 @@ pub async fn admin_auth_middleware(
                                 .as_ref()
                                 .and_then(|m| m.role.as_deref())
                         })
-                        .or_else(|| claims.role.as_deref())
+                        .or(claims.role.as_deref())
                         .unwrap_or("");
 
                     tracing::info!("[Admin Auth] Parsed user_id={} role='{}'", claims.sub, role);
