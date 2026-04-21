@@ -57,7 +57,11 @@ pub async fn auth_middleware(
     let claims = match verify_supabase_jwt(token, &state.config.supabase_jwt_secret) {
         Ok(c) => c,
         Err(e) => {
-            warn!("JWT verification failed: {}", e);
+            warn!(
+                "[Partner Auth] JWT verification failed: {}. Token prefix: '{}'",
+                e,
+                &token[..token.len().min(10)]
+            );
             return Err((
                 StatusCode::UNAUTHORIZED,
                 axum::Json(json!({"error": "Invalid token"})),
@@ -65,7 +69,7 @@ pub async fn auth_middleware(
         }
     };
 
-    // Extract role for admin bypass check
+    // Extract role for admin bypass check - Check app_metadata, user_metadata, and top-level role
     let user_role = claims
         .app_metadata
         .role
@@ -76,8 +80,17 @@ pub async fn auth_middleware(
                 .as_ref()
                 .and_then(|m| m.role.as_deref())
         })
+        .or_else(|| claims.role.as_deref())
         .unwrap_or("");
-    let is_admin = user_role == "admin" || user_role == "core_admin";
+
+    let is_admin = user_role == "admin" || user_role == "core_admin" || user_role == "super_admin";
+
+    if is_admin {
+        tracing::debug!(
+            "[Partner Auth] Admin shadow access verified for sub={}",
+            claims.sub
+        );
+    }
 
     // Support Admin Shadowing: If admin, they can provide org_id via x-tenant-id header
     let partner_id = claims
@@ -93,10 +106,17 @@ pub async fn auth_middleware(
                 None
             }
         })
-        .ok_or((
-            StatusCode::FORBIDDEN,
-            axum::Json(json!({"error": "No org_id found in token and not an admin shadowing"})),
-        ))?;
+        .ok_or_else(|| {
+            warn!(
+                "[Partner Auth] No org_id found and not an admin shadowing. Role: {}. Claims: {}",
+                user_role,
+                serde_json::to_string(&claims).unwrap_or_default()
+            );
+            (
+                StatusCode::FORBIDDEN,
+                axum::Json(json!({"error": "No org_id found in token and not an admin shadowing"})),
+            )
+        })?;
 
     // Load partner config from local DB
     let tenant = match state.db.get_tenant_by_partner_id(&partner_id).await {
@@ -193,7 +213,7 @@ pub async fn admin_auth_middleware(
         if let Some(token) = auth_header.strip_prefix("Bearer ") {
             match verify_supabase_jwt(token, &state.config.supabase_jwt_secret) {
                 Ok(claims) => {
-                    // Check role in app_metadata or user_metadata
+                    // Check role in app_metadata or user_metadata or top-level role
                     let role = claims
                         .app_metadata
                         .role
@@ -204,14 +224,19 @@ pub async fn admin_auth_middleware(
                                 .as_ref()
                                 .and_then(|m| m.role.as_deref())
                         })
+                        .or_else(|| claims.role.as_deref())
                         .unwrap_or("");
 
                     tracing::info!("[Admin Auth] Parsed user_id={} role='{}'", claims.sub, role);
 
-                    if role == "admin" || role == "core_admin" {
+                    if role == "admin" || role == "core_admin" || role == "super_admin" {
                         return Ok(next.run(req).await);
                     } else {
-                        warn!("[Admin Auth] User has insufficient role: '{}'", role);
+                        warn!(
+                            "[Admin Auth] Insufficient role '{}'. Full claims: {}",
+                            role,
+                            serde_json::to_string(&claims).unwrap_or_default()
+                        );
                     }
                 }
                 Err(e) => {
