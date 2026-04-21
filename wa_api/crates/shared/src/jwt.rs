@@ -22,6 +22,7 @@ pub struct SupabaseClaims {
 pub struct AppMetadata {
     pub provider: Option<String>,
     pub providers: Option<Vec<String>>,
+    #[serde(alias = "orgId")]
     pub org_id: Option<Uuid>,
     pub role: Option<String>,
 }
@@ -40,19 +41,20 @@ pub struct AdminClaims {
 }
 
 pub fn verify_supabase_jwt(token: &str, secret: &str) -> Result<SupabaseClaims> {
-    use base64::prelude::BASE64_STANDARD;
-    use base64::Engine as _;
-    let secret_bytes = BASE64_STANDARD
-        .decode(secret)
-        .map_err(|e| anyhow!("Failed to decode JWT secret from base64: {}", e))?;
-
     let mut validation = Validation::new(Algorithm::HS256);
-    // Be more permissive with audience during transition/debugging
     validation.validate_aud = false;
 
-    let token_data =
-        decode::<SupabaseClaims>(token, &DecodingKey::from_secret(&secret_bytes), &validation)
-            .map_err(|e| anyhow!("JWT verification failed: {}", e))?;
+    // Supabase JWT secret is often b64 encoded in the dashboard, 
+    // but the library needs the raw bytes.
+    let decoding_key = if let Ok(bytes) = base64::engine::general_purpose::STANDARD.decode(secret) {
+        DecodingKey::from_secret(&bytes)
+    } else {
+        // Fallback to raw string if not b64
+        DecodingKey::from_secret(secret.as_bytes())
+    };
+
+    let token_data = decode::<SupabaseClaims>(token, &decoding_key, &validation)
+        .map_err(|e| anyhow!("JWT verification failed: {}", e))?;
 
     Ok(token_data.claims)
 }
