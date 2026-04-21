@@ -1,7 +1,7 @@
 use jsonwebtoken::{encode, EncodingKey, Header};
 use shared::jwt::{AppMetadata, SupabaseClaims, UserMetadata};
-use uuid::Uuid;
 use std::time::{SystemTime, UNIX_EPOCH};
+use uuid::Uuid;
 
 fn main() {
     dotenvy::dotenv().ok();
