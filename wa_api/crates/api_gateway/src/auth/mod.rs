@@ -12,8 +12,8 @@ use std::sync::Arc;
 use tracing::{error, warn};
 use uuid::Uuid;
 
+use shared::jwt::{verify_admin_jwt, verify_supabase_jwt};
 use shared::state::AppState;
-use shared::jwt::{verify_supabase_jwt, verify_admin_jwt};
 
 /// Constant-time string comparison via SHA-256 hash.
 /// Prevents timing attacks by always comparing fixed-length hashes
@@ -31,7 +31,8 @@ pub async fn auth_middleware(
     mut req: Request<Body>,
     next: Next,
 ) -> Result<Response, (StatusCode, axum::Json<serde_json::Value>)> {
-    let auth_header = req.headers()
+    let auth_header = req
+        .headers()
         .get("Authorization")
         .and_then(|v| v.to_str().ok())
         .and_then(|s| s.strip_prefix("Bearer "));
@@ -45,7 +46,7 @@ pub async fn auth_middleware(
                 return legacy_auth_middleware(state, req, next).await;
             }
         }
-        
+
         return Err((
             StatusCode::UNAUTHORIZED,
             axum::Json(json!({"error": "Missing or malformed Authorization header"})),
@@ -143,21 +144,39 @@ pub async fn admin_auth_middleware(
     next: Next,
 ) -> Result<Response, (StatusCode, axum::Json<serde_json::Value>)> {
     // 1. Try static x-admin-key (Machine-to-Machine)
-    if let Some(key) = req.headers().get("x-admin-key").and_then(|v| v.to_str().ok()) {
-        if !state.config.admin_api_key.is_empty() && constant_time_eq(key, &state.config.admin_api_key) {
+    if let Some(key) = req
+        .headers()
+        .get("x-admin-key")
+        .and_then(|v| v.to_str().ok())
+    {
+        if !state.config.admin_api_key.is_empty()
+            && constant_time_eq(key, &state.config.admin_api_key)
+        {
             return Ok(next.run(req).await);
         }
     }
 
     // 2. Try Supabase JWT (Dashboard Admins)
-    if let Some(auth_header) = req.headers().get("Authorization").and_then(|v| v.to_str().ok()) {
+    if let Some(auth_header) = req
+        .headers()
+        .get("Authorization")
+        .and_then(|v| v.to_str().ok())
+    {
         if let Some(token) = auth_header.strip_prefix("Bearer ") {
             if let Ok(claims) = verify_supabase_jwt(token, &state.config.supabase_jwt_secret) {
                 // Check role in app_metadata or user_metadata
-                let role = claims.app_metadata.role.as_deref()
-                    .or_else(|| claims.user_metadata.as_ref().and_then(|m| m.role.as_deref()))
+                let role = claims
+                    .app_metadata
+                    .role
+                    .as_deref()
+                    .or_else(|| {
+                        claims
+                            .user_metadata
+                            .as_ref()
+                            .and_then(|m| m.role.as_deref())
+                    })
                     .unwrap_or("");
-                
+
                 if role == "admin" || role == "core_admin" {
                     return Ok(next.run(req).await);
                 }
@@ -166,7 +185,11 @@ pub async fn admin_auth_middleware(
     }
 
     // 3. Try internal Admin JWT (Optional fallback for specific wa_api scripts)
-    if let Some(auth_header) = req.headers().get("x-admin-token").and_then(|v| v.to_str().ok()) {
+    if let Some(auth_header) = req
+        .headers()
+        .get("x-admin-token")
+        .and_then(|v| v.to_str().ok())
+    {
         if verify_admin_jwt(auth_header, &state.config.admin_jwt_secret).is_ok() {
             return Ok(next.run(req).await);
         }
@@ -189,7 +212,11 @@ pub async fn webhook_auth_middleware(
         .headers()
         .get("x-evo-api-key")
         .and_then(|v| v.to_str().ok())
-        .or_else(|| req.headers().get("x-webhook-secret").and_then(|v| v.to_str().ok())); // Backward compat
+        .or_else(|| {
+            req.headers()
+                .get("x-webhook-secret")
+                .and_then(|v| v.to_str().ok())
+        }); // Backward compat
 
     let expected_secret = &state.config.evo_internal_api_key;
 
@@ -224,8 +251,18 @@ async fn legacy_auth_middleware(
 
     let tenant = match state.db.get_tenant_by_partner_id(&partner_id).await {
         Ok(Some(t)) => t,
-        Ok(None) => return Err((StatusCode::FORBIDDEN, axum::Json(json!({"error": "Partner not found"})))),
-        Err(_) => return Err((StatusCode::INTERNAL_SERVER_ERROR, axum::Json(json!({"error": "DB error"})))),
+        Ok(None) => {
+            return Err((
+                StatusCode::FORBIDDEN,
+                axum::Json(json!({"error": "Partner not found"})),
+            ))
+        }
+        Err(_) => {
+            return Err((
+                StatusCode::INTERNAL_SERVER_ERROR,
+                axum::Json(json!({"error": "DB error"})),
+            ))
+        }
     };
 
     let ctx = TenantContext {

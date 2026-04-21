@@ -1,8 +1,8 @@
 pub mod config;
-pub mod jwt;
 pub mod db;
 #[path = "evolution.rs"]
 pub mod evo;
+pub mod jwt;
 pub mod redis_client;
 pub mod state;
 pub mod types;
