@@ -145,6 +145,14 @@ impl DbClient {
         self.get_tenant_by_partner_id(org_id).await
     }
 
+    pub async fn delete_tenant(&self, tenant_id: &Uuid) -> Result<()> {
+        sqlx::query("DELETE FROM tenants WHERE id = $1")
+            .bind(tenant_id)
+            .execute(&self.pool)
+            .await?;
+        Ok(())
+    }
+
     // ─── Consent ──────────────────────────────────────────────────────────
 
     pub async fn is_opted_out_platform(&self, phone_hash: &str) -> Result<bool> {

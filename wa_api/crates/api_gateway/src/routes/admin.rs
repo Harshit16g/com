@@ -1,8 +1,8 @@
 use axum::{
-    extract::{Query, State},
+    extract::{Path, Query, State},
     http::StatusCode,
     response::IntoResponse,
-    routing::{get, post},
+    routing::{delete, get, post},
     Json, Router,
 };
 use serde::{Deserialize, Serialize};
@@ -484,6 +484,40 @@ pub fn router() -> Router<Arc<AppState>> {
             "/admin/tenant/update-limits",
             post(admin_update_tenant_limits),
         )
+        .route("/admin/instance/:id", delete(admin_delete_instance))
         .route("/admin/pool", get(admin_list_pool))
         .route("/admin/pool/add", post(admin_add_pool_number))
+}
+
+/// DELETE /admin/instance/:id
+async fn admin_delete_instance(
+    State(state): State<Arc<AppState>>,
+    Path(tenant_id): Path<Uuid>,
+) -> impl IntoResponse {
+    // 1. Get instance name before deleting from DB
+    let tenant = match state.db.get_tenant(&tenant_id).await {
+        Ok(Some(t)) => t,
+        _ => return (StatusCode::NOT_FOUND, Json(json!({"error": "Tenant not found"}))).into_response(),
+    };
+
+    // 2. Delete from Evolution API (WhatsApp Engine)
+    if let Err(e) = state.evo.delete_instance(&tenant.instance_name).await {
+        tracing::error!("Failed to delete instance from Evo: {}", e);
+        // We continue anyway to ensure DB is cleaned up, but log the error
+    }
+
+    // 3. Delete from Rust Database
+    if let Err(e) = state.db.delete_tenant(&tenant_id).await {
+        tracing::error!("Failed to delete tenant from DB: {}", e);
+        return (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": e.to_string()}))).into_response();
+    }
+
+    // 4. Clear Redis health status
+    let redis_key = format!("instance_health:{}", tenant.instance_name);
+    if let Err(e) = state.redis.del(&redis_key).await {
+        tracing::error!("Failed to delete instance health from Redis: {}", e);
+        return (StatusCode::OK, Json(json!({"status": "deleted", "warning": "Redis cleanup failed"}))).into_response();
+    }
+
+    (StatusCode::OK, Json(json!({"status": "deleted"}))).into_response()
 }
