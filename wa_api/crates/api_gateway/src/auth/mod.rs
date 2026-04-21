@@ -58,13 +58,13 @@ pub async fn auth_middleware(
         Ok(c) => c,
         Err(e) => {
             warn!(
-                "[Partner Auth] JWT verification failed: {}. Token prefix: '{}'",
+                "[Partner Auth] JWT verification failed: {}. Token: {}...",
                 e,
-                &token[..token.len().min(10)]
+                &token[..token.len().min(8)]
             );
             return Err((
                 StatusCode::UNAUTHORIZED,
-                axum::Json(json!({"error": "Invalid token"})),
+                axum::Json(json!({"error": "Invalid token", "details": e.to_string()})),
             ));
         }
     };
@@ -240,7 +240,7 @@ pub async fn admin_auth_middleware(
                     }
                 }
                 Err(e) => {
-                    warn!("[Admin Auth] JWT verification failed: {}", e);
+                    warn!("[Admin Auth] JWT verification failed: {}. Roles check skipped.", e);
                 }
             }
         }
