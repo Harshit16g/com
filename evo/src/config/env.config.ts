@@ -868,7 +868,7 @@ export class ConfigService {
       },
       AUTHENTICATION: {
         API_KEY: {
-          KEY: process.env.AUTHENTICATION_API_KEY || 'BQYHJGJHJ',
+          KEY: process.env.INTERNAL_API_KEY || process.env.AUTHENTICATION_API_KEY || 'BQYHJGJHJ',
         },
         EXPOSE_IN_FETCH_INSTANCES: process.env?.AUTHENTICATION_EXPOSE_IN_FETCH_INSTANCES === 'true',
       },

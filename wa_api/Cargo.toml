@@ -57,6 +57,10 @@ tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
 # Config / env
 dotenvy = "0.15"
 
+# JWT
+jsonwebtoken = "9"
+serde_with = { version = "3", features = ["chrono"] }
+
 # Random
 rand = "0.8"
 

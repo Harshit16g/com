@@ -140,6 +140,11 @@ impl DbClient {
         Ok(row)
     }
 
+    /// Alias for get_tenant_by_partner_id — maps to Supabase org_id.
+    pub async fn get_tenant_by_org_id(&self, org_id: &Uuid) -> Result<Option<TenantRow>> {
+        self.get_tenant_by_partner_id(org_id).await
+    }
+
     // ─── Consent ──────────────────────────────────────────────────────────
 
     pub async fn is_opted_out_platform(&self, phone_hash: &str) -> Result<bool> {

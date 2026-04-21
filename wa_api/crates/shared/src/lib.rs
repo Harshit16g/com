@@ -1,4 +1,5 @@
 pub mod config;
+pub mod jwt;
 pub mod db;
 #[path = "evolution.rs"]
 pub mod evo;
