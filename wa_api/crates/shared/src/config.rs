@@ -30,6 +30,8 @@ pub struct AppConfig {
     pub admin_api_key: String,
     /// Allowed CORS origins (comma-separated). Use "*" for dev only.
     pub cors_allowed_origins: Vec<String>,
+    /// Number of concurrent worker loops to spawn.
+    pub worker_count: u32,
 }
 
 impl AppConfig {
@@ -63,6 +65,10 @@ impl AppConfig {
             .unwrap_or_else(|_| "15".to_string())
             .parse()?;
 
+        let worker_count: u32 = env::var("WORKER_COUNT")
+            .unwrap_or_else(|_| "4".to_string())
+            .parse()?;
+
         if max_send_delay_secs < min_send_delay_secs {
             return Err(anyhow::anyhow!(
                 "MAX_SEND_DELAY_SECS ({}) cannot be less than MIN_SEND_DELAY_SECS ({})",
@@ -77,13 +83,16 @@ impl AppConfig {
             evo_base_url: required("EVO_BASE_URL")?,
             evo_api_key: env::var("EVO_API_KEY").unwrap_or_else(|_| evo_internal_api_key.clone()),
             alert_webhook_url: env::var("ALERT_WEBHOOK_URL").ok(),
-            server_port: env::var("PORT")
+            server_port: env::var("GATEWAY_PORT")
+                .or_else(|_| env::var("PORT"))
                 .or_else(|_| env::var("SERVER_PORT"))
                 .unwrap_or_else(|_| "8080".to_string())
                 .parse()?,
             min_send_delay_secs,
             max_send_delay_secs,
-            platform_webhook_url: env::var("PLATFORM_WEBHOOK_URL").ok(),
+            platform_webhook_url: env::var("WA_API_WEBHOOK_URL")
+                .or_else(|_| env::var("PLATFORM_WEBHOOK_URL"))
+                .ok(),
             platform_api_key: env::var("PLATFORM_API_KEY").ok(),
             supabase_jwt_secret: env::var("SUPABASE_JWT_SECRET").unwrap_or_default(),
             admin_jwt_secret: env::var("ADMIN_JWT_SECRET").unwrap_or_default(),
@@ -92,6 +101,7 @@ impl AppConfig {
             pauth_api_key,
             admin_api_key,
             cors_allowed_origins,
+            worker_count,
         })
     }
 }

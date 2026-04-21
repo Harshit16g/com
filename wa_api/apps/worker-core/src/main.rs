@@ -15,15 +15,22 @@ async fn main() {
     // Spawn scheduler task
     tokio::spawn(scheduler::start(state.clone()));
 
-    // Start worker loop with internal resilience and retry mechanism
-    tokio::spawn(async move {
-        loop {
-            if let Err(e) = worker::start(state.clone()).await {
-                tracing::error!("Worker crashed: {:?}", e);
-                tokio::time::sleep(Duration::from_secs(5)).await;
+    // Start worker pool based on configuration
+    let worker_count = state.config.worker_count;
+    tracing::info!("Starting worker pool with {} workers", worker_count);
+
+    for i in 0..worker_count {
+        let state = state.clone();
+        tokio::spawn(async move {
+            tracing::info!("Worker {} starting", i);
+            loop {
+                if let Err(e) = worker::start(state.clone()).await {
+                    tracing::error!("Worker {} crashed: {:?}", i, e);
+                    tokio::time::sleep(Duration::from_secs(5)).await;
+                }
             }
-        }
-    });
+        });
+    }
 
     signal::ctrl_c().await.unwrap();
     tracing::info!("Worker shutting down");
