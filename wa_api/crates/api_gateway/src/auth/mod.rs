@@ -163,22 +163,31 @@ pub async fn admin_auth_middleware(
         .and_then(|v| v.to_str().ok())
     {
         if let Some(token) = auth_header.strip_prefix("Bearer ") {
-            if let Ok(claims) = verify_supabase_jwt(token, &state.config.supabase_jwt_secret) {
-                // Check role in app_metadata or user_metadata
-                let role = claims
-                    .app_metadata
-                    .role
-                    .as_deref()
-                    .or_else(|| {
-                        claims
-                            .user_metadata
-                            .as_ref()
-                            .and_then(|m| m.role.as_deref())
-                    })
-                    .unwrap_or("");
+            match verify_supabase_jwt(token, &state.config.supabase_jwt_secret) {
+                Ok(claims) => {
+                    // Check role in app_metadata or user_metadata
+                    let role = claims
+                        .app_metadata
+                        .role
+                        .as_deref()
+                        .or_else(|| {
+                            claims
+                                .user_metadata
+                                .as_ref()
+                                .and_then(|m| m.role.as_deref())
+                        })
+                        .unwrap_or("");
 
-                if role == "admin" || role == "core_admin" {
-                    return Ok(next.run(req).await);
+                    tracing::info!("[Admin Auth] Parsed user_id={} role='{}'", claims.sub, role);
+
+                    if role == "admin" || role == "core_admin" {
+                        return Ok(next.run(req).await);
+                    } else {
+                        warn!("[Admin Auth] User has insufficient role: '{}'", role);
+                    }
+                }
+                Err(e) => {
+                    warn!("[Admin Auth] JWT verification failed: {}", e);
                 }
             }
         }
