@@ -59,6 +59,7 @@ dependencies = [
  "dotenvy",
  "fred",
  "hex",
+ "jsonwebtoken",
  "native-tls",
  "pool_manager",
  "rand 0.8.5",

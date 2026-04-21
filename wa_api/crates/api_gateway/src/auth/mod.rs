@@ -54,6 +54,16 @@ pub async fn auth_middleware(
     }
 
     let token = auth_header.unwrap();
+
+    // --- DIAGNOSTIC START ---
+    if let Ok(header) = jsonwebtoken::decode_header(token) {
+        tracing::error!(
+            "=== JWT DIAGNOSTIC: Token Header ALG = {:?} ===",
+            header.alg
+        );
+    }
+    // --- DIAGNOSTIC END ---
+
     let claims = match verify_supabase_jwt(token, &state.config.supabase_jwt_secret) {
         Ok(c) => c,
         Err(e) => {
@@ -211,6 +221,11 @@ pub async fn admin_auth_middleware(
         .and_then(|v| v.to_str().ok())
     {
         if let Some(token) = auth_header.strip_prefix("Bearer ") {
+            // --- DIAGNOSTIC START ---
+            if let Ok(header) = jsonwebtoken::decode_header(token) {
+                tracing::error!("=== ADMIN JWT DIAGNOSTIC: Token Header ALG = {:?} ===", header.alg);
+            }
+            // --- DIAGNOSTIC END ---
             match verify_supabase_jwt(token, &state.config.supabase_jwt_secret) {
                 Ok(claims) => {
                     // Check role in app_metadata or user_metadata or top-level role
@@ -240,7 +255,10 @@ pub async fn admin_auth_middleware(
                     }
                 }
                 Err(e) => {
-                    warn!("[Admin Auth] JWT verification failed: {}. Roles check skipped.", e);
+                    warn!(
+                        "[Admin Auth] JWT verification failed: {}. Roles check skipped.",
+                        e
+                    );
                 }
             }
         }
