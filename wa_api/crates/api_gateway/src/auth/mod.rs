@@ -128,6 +128,13 @@ pub async fn auth_middleware(
             )
         })?;
 
+    tracing::info!(
+        "[Partner Auth] Verified access for partner_id={} (Role: {}, AdminShadow: {})",
+        partner_id,
+        user_role,
+        is_admin && claims.app_metadata.org_id.is_none()
+    );
+
     // Load partner config from local DB
     let tenant = match state.db.get_tenant_by_partner_id(&partner_id).await {
         Ok(Some(t)) => t,
