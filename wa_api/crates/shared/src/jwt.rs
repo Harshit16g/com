@@ -40,8 +40,9 @@ pub struct AdminClaims {
 }
 
 pub fn verify_supabase_jwt(token: &str, secret: &str) -> Result<SupabaseClaims> {
-    use base64::{engine::general_purpose, Engine as _};
-    let secret_bytes = general_purpose::BASE64_STANDARD
+    use base64::prelude::BASE64_STANDARD;
+    use base64::Engine as _;
+    let secret_bytes = BASE64_STANDARD
         .decode(secret)
         .map_err(|e| anyhow!("Failed to decode JWT secret from base64: {}", e))?;
 
@@ -49,18 +50,15 @@ pub fn verify_supabase_jwt(token: &str, secret: &str) -> Result<SupabaseClaims> 
     // Be more permissive with audience during transition/debugging
     validation.validate_aud = false;
 
-    let token_data = decode::<SupabaseClaims>(
-        token,
-        &DecodingKey::from_secret(&secret_bytes),
-        &validation,
-    )
-    .map_err(|e| anyhow!("JWT verification failed: {}", e))?;
+    let token_data =
+        decode::<SupabaseClaims>(token, &DecodingKey::from_secret(&secret_bytes), &validation)
+            .map_err(|e| anyhow!("JWT verification failed: {}", e))?;
 
     Ok(token_data.claims)
 }
 
 pub fn verify_admin_jwt(token: &str, secret: &str) -> Result<AdminClaims> {
-    // Admin secret is usually a raw string, not base64. 
+    // Admin secret is usually a raw string, not base64.
     // If it's also base64, we'd decode it, but for now assuming it matches the .env direct value.
     let validation = Validation::new(Algorithm::HS256);
 
