@@ -65,9 +65,24 @@ pub async fn auth_middleware(
         }
     };
 
-    let partner_id = claims.app_metadata.org_id.ok_or((
+    // Extract role for admin bypass check
+    let user_role = claims.app_metadata.role.as_deref()
+        .or_else(|| claims.user_metadata.as_ref().and_then(|m| m.role.as_deref()))
+        .unwrap_or("");
+    let is_admin = user_role == "admin" || user_role == "core_admin";
+
+    // Support Admin Shadowing: If admin, they can provide org_id via x-tenant-id header
+    let partner_id = claims.app_metadata.org_id.or_else(|| {
+        if is_admin {
+            req.headers().get("x-tenant-id")
+                .and_then(|v| v.to_str().ok())
+                .and_then(|s| Uuid::parse_str(s).ok())
+        } else {
+            None
+        }
+    }).ok_or((
         StatusCode::FORBIDDEN,
-        axum::Json(json!({"error": "No org_id found in token metadata"})),
+        axum::Json(json!({"error": "No org_id found in token and not an admin shadowing"})),
     ))?;
 
     // Load partner config from local DB
