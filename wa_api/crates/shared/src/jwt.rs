@@ -5,12 +5,16 @@ use uuid::Uuid;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct SupabaseClaims {
+    #[serde(default)]
     pub aud: Option<serde_json::Value>,
     pub exp: usize,
     pub sub: Uuid,
     pub email: Option<String>,
+    #[serde(default)]
     pub app_metadata: AppMetadata,
+    #[serde(default)]
     pub user_metadata: Option<UserMetadata>,
+    #[serde(default)]
     pub role: Option<String>,
 }
 
@@ -38,7 +42,7 @@ pub struct AdminClaims {
 pub fn verify_supabase_jwt(token: &str, secret: &str) -> Result<SupabaseClaims> {
     let mut validation = Validation::new(Algorithm::HS256);
     // Be more permissive with audience during transition/debugging
-    validation.validate_aud = false; 
+    validation.validate_aud = false;
 
     let token_data = decode::<SupabaseClaims>(
         token,

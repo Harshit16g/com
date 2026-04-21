@@ -7,3 +7,4 @@ pub mod redis_client;
 pub mod state;
 pub mod types;
 pub mod utils;
+pub mod tests;
