@@ -6,11 +6,13 @@ use uuid::Uuid;
 fn main() {
     dotenvy::dotenv().ok();
     let secret_raw = std::env::var("SUPABASE_JWT_SECRET").expect("SUPABASE_JWT_SECRET not set");
-    
+
     use base64::prelude::BASE64_STANDARD;
     use base64::Engine as _;
-    let secret_bytes = BASE64_STANDARD.decode(&secret_raw).expect("Failed to decode secret from base64");
-    
+    let secret_bytes = BASE64_STANDARD
+        .decode(&secret_raw)
+        .expect("Failed to decode secret from base64");
+
     let key = EncodingKey::from_secret(&secret_bytes);
 
     let now = SystemTime::now()
