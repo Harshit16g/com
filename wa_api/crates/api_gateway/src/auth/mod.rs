@@ -223,7 +223,10 @@ pub async fn admin_auth_middleware(
         if let Some(token) = auth_header.strip_prefix("Bearer ") {
             // --- DIAGNOSTIC START ---
             if let Ok(header) = jsonwebtoken::decode_header(token) {
-                tracing::error!("=== ADMIN JWT DIAGNOSTIC: Token Header ALG = {:?} ===", header.alg);
+                tracing::error!(
+                    "=== ADMIN JWT DIAGNOSTIC: Token Header ALG = {:?} ===",
+                    header.alg
+                );
             }
             // --- DIAGNOSTIC END ---
             match verify_supabase_jwt(token, &state.config.supabase_jwt_secret) {
