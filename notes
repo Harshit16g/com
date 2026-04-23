@@ -21,3 +21,32 @@ Try testing the NextJS server again locally (npm run dev) or retrigger a Vercel 
 Load up the Partner or Admin dashboard and verify the API calls.
 The wa_api backend on Railway will now seamlessly receive structurally correct HS256 tokens and authenticate instantly. No new Rust redeployment needed!
 Let me know if you run into any more 401 or 403 errors—but with this proxy token exchange, the pipeline is solid!
+
+# Walkthrough - Intelligent Sync & Auto-Fetch Patch
+
+I have patched the Platform Sync system to preserve conversation history and implemented automatic partner metadata fetching for new instances.
+
+## Changes Made
+
+### 1. Intelligent Platform Sync
+- **Append-Only History**: Created migration [007_intelligent_sync.sql](file:///home/harshit/projects/leaex/com/wa_api/migrations/007_intelligent_sync.sql) which updates the `comms.handle_wa_api_event` RPC in Supabase.
+- **Audit Integrity**: The system now uses the `||` operator to append every WhatsApp event to a `chat_history` JSONB array in the `comms.wa_conversations` table. This ensures that even if messages are deleted on the phone, the audit trail remains intact on the platform.
+- **Unique Constraint**: Added a unique constraint on `(org_id, evo_contact_phone)` to ensure robust upsert operations.
+
+### 2. Auto-Fetch Partner Metadata
+- **Provisioning Flow**: In `admin_create_instance`, the system now automatically reaches out to the Platform DB to fetch the **Business Name** and **Partner Name** for the given `org_id`.
+- **Lora Identity**: These names are saved directly into the `tenants` table during assignment, allowing Lora to start using personalized greetings immediately.
+- **Improved DbClient**: Added `fetch_platform_partner_info` to the shared database crate to handle cross-system metadata resolution.
+
+## Verification Results
+
+### 1. Compilation
+The entire `wa_api` workspace was verified with `cargo check` and compiles successfully.
+
+### 2. SQL Patch
+The intelligent sync SQL has been provided for execution in Supabase: [intelligent_sync.sql](file:///home/harshit/projects/leaex/com/wa_api/migrations/007_intelligent_sync.sql).
+
+## Next Steps for User
+> [!IMPORTANT]
+> **Execute SQL Patch**: Run the contents of `com/wa_api/migrations/007_intelligent_sync.sql` in your Supabase SQL editor to enable the intelligent history tracking.
+> **Verification**: Create a new test instance via the admin panel; you should see the `business_name` and `partner_name` populated automatically in your `tenants` table.
