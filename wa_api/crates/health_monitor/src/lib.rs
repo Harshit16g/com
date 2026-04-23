@@ -38,7 +38,7 @@ pub async fn start(state: Arc<AppState>) -> Result<()> {
     if let Err(e) = check_all_instances(redis, evo, db, &alert_url).await {
         error!("Initial health check error: {}", e);
     }
-    
+
     // Initial orphan audit on startup
     info!("Running startup orphan audit...");
     let _ = cleanup_orphan_instances(state.clone()).await;
@@ -157,7 +157,10 @@ async fn fetch_platform_sessions(platform_db: &sqlx::PgPool) -> Result<Vec<(Stri
         .fetch_all(platform_db)
         .await?;
 
-    Ok(rows.into_iter().map(|r| (r.instance_id, r.org_id)).collect())
+    Ok(rows
+        .into_iter()
+        .map(|r| (r.instance_id, r.org_id))
+        .collect())
 }
 
 /// Check the status of all instances in the evo API and update local redis/db.

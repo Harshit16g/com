@@ -2,7 +2,7 @@ use axum::{extract::State, http::StatusCode, response::IntoResponse, routing::po
 use serde::Deserialize;
 use serde_json::json;
 use std::sync::Arc;
-use tracing::{error, info};
+use tracing::info;
 
 use shared::state::AppState;
 
@@ -211,20 +211,19 @@ async fn evo_webhook(
 
                 // Sync to Platform via RPC
                 if let Ok(Some(tenant)) = state.db.get_tenant_by_instance_name(instance).await {
-                    if let (Some(platform_db), Some(org_id)) = (&state.platform_db, &tenant.partner_id) {
+                    if let (Some(platform_db), Some(org_id)) =
+                        (&state.platform_db, &tenant.partner_id)
+                    {
                         let payload = json!({
                             "status": health.as_str(),
                             "instance": instance,
                             "phone": tenant.wa_number,
                             "timestamp": chrono::Utc::now()
                         });
-                        let _ = state.db.sync_to_platform_rpc(
-                            platform_db,
-                            org_id,
-                            instance,
-                            "status",
-                            payload
-                        ).await;
+                        let _ = state
+                            .db
+                            .sync_to_platform_rpc(platform_db, org_id, instance, "status", payload)
+                            .await;
                     }
                 }
             }
@@ -342,19 +341,24 @@ async fn evo_webhook(
 
                     // Notify platform via RPC that QR is pending scan
                     if let Ok(Some(tenant)) = state.db.get_tenant_by_instance_name(instance).await {
-                        if let (Some(platform_db), Some(org_id)) = (&state.platform_db, &tenant.partner_id) {
+                        if let (Some(platform_db), Some(org_id)) =
+                            (&state.platform_db, &tenant.partner_id)
+                        {
                             let payload = json!({
                                 "status": "qr_pending",
                                 "instance": instance,
                                 "timestamp": chrono::Utc::now()
                             });
-                            let _ = state.db.sync_to_platform_rpc(
-                                platform_db,
-                                org_id,
-                                instance,
-                                "status",
-                                payload
-                            ).await;
+                            let _ = state
+                                .db
+                                .sync_to_platform_rpc(
+                                    platform_db,
+                                    org_id,
+                                    instance,
+                                    "status",
+                                    payload,
+                                )
+                                .await;
                         }
                     }
                 }
@@ -388,7 +392,6 @@ async fn evo_webhook(
 }
 
 /// Notify the main platform (Leaex v2) of status changes - DELETED (Now using RPC)
-
 pub fn router() -> Router<Arc<AppState>> {
     Router::new()
         .route(
