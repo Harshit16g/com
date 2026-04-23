@@ -34,10 +34,14 @@ pub async fn start(state: Arc<AppState>) -> Result<()> {
 
     let mut last_orphan_cleanup = std::time::Instant::now();
 
-    // Initial check on startup
+    // Initial health check on startup
     if let Err(e) = check_all_instances(redis, evo, db, &alert_url).await {
         error!("Initial health check error: {}", e);
     }
+    
+    // Initial orphan audit on startup
+    info!("Running startup orphan audit...");
+    let _ = cleanup_orphan_instances(state.clone()).await;
 
     loop {
         // ── 1. Calculate Sleep Duration ──────────────────────────────────────
@@ -82,7 +86,13 @@ pub async fn start(state: Arc<AppState>) -> Result<()> {
             error!("Processing recovery error: {}", e);
         }
 
-        // ── 3. Deep Orphan Cleanup (Every 6 Hours) ───────────────────────────
+        // ── 3. Immediate Local Audit (Every tick) ──────────────────────────
+        // Ensure local tenants that don't match platform state are marked orphan immediately.
+        if let Err(e) = audit_local_tenants_against_platform(state.clone()).await {
+            error!("Local audit error: {}", e);
+        }
+
+        // ── 4. Deep Orphan Cleanup (Every 6 Hours) ───────────────────────────
         if last_orphan_cleanup.elapsed() >= Duration::from_secs(6 * 3600) {
             info!("Running 6-hour deep orphan cleanup...");
             if let Err(e) = cleanup_orphan_instances(state.clone()).await {
@@ -95,7 +105,62 @@ pub async fn start(state: Arc<AppState>) -> Result<()> {
     }
 }
 
-/// Check if an instance name is managed by this wa_api deployment.
+async fn audit_local_tenants_against_platform(state: Arc<AppState>) -> Result<()> {
+    let db = &state.db;
+    let evo = &state.evo;
+
+    let local_tenants = db.get_all_tenants().await?;
+
+    let platform_sessions = if let Some(platform_db) = &state.platform_db {
+        fetch_platform_sessions(platform_db).await?
+    } else {
+        return Ok(());
+    };
+
+    for tenant in local_tenants {
+        let platform_session = platform_sessions
+            .iter()
+            .find(|(id, _)| id == &tenant.instance_name);
+
+        match platform_session {
+            None => {
+                warn!(instance = %tenant.instance_name, "Local tenant marked as orphan IMMEDIATE (missing in Platform DB)");
+                let _ = db
+                    .mark_tenant_orphan(&tenant.instance_name, "orphan cleaned immediate")
+                    .await;
+                let _ = evo.delete_instance(&tenant.instance_name).await;
+            }
+            Some((_, org_id)) => {
+                if let Some(partner_id) = tenant.partner_id {
+                    if partner_id != *org_id {
+                        warn!(instance = %tenant.instance_name, "Local tenant marked as orphan IMMEDIATE (org_id mismatch)");
+                        let _ = db
+                            .mark_tenant_orphan(&tenant.instance_name, "org_id mismatch")
+                            .await;
+                        let _ = evo.delete_instance(&tenant.instance_name).await;
+                    }
+                }
+            }
+        }
+    }
+
+    Ok(())
+}
+
+async fn fetch_platform_sessions(platform_db: &sqlx::PgPool) -> Result<Vec<(String, uuid::Uuid)>> {
+    #[derive(sqlx::FromRow)]
+    struct Session {
+        instance_id: String,
+        org_id: uuid::Uuid,
+    }
+    let rows = sqlx::query_as::<_, Session>("SELECT instance_id, org_id FROM comms.wa_sessions")
+        .fetch_all(platform_db)
+        .await?;
+
+    Ok(rows.into_iter().map(|r| (r.instance_id, r.org_id)).collect())
+}
+
+/// Check the status of all instances in the evo API and update local redis/db.
 fn is_managed_instance(name: &str) -> bool {
     MANAGED_PREFIXES
         .iter()
@@ -158,21 +223,10 @@ async fn cleanup_orphan_instances(state: Arc<AppState>) -> Result<()> {
 
     // 2. Fetch platform sessions if database is available
     let platform_sessions = if let Some(platform_db) = &state.platform_db {
-        #[derive(sqlx::FromRow)]
-        struct Session {
-            instance_id: String,
-            org_id: uuid::Uuid,
-        }
-        match sqlx::query_as::<_, Session>("SELECT instance_id, org_id FROM comms.wa_sessions")
-            .fetch_all(platform_db)
-            .await
-        {
-            Ok(rows) => rows
-                .into_iter()
-                .map(|r| (r.instance_id, r.org_id))
-                .collect::<Vec<_>>(),
+        match fetch_platform_sessions(platform_db).await {
+            Ok(s) => s,
             Err(e) => {
-                error!("Failed to fetch platform sessions: {}", e);
+                error!("Failed to fetch platform sessions for deep cleanup: {}", e);
                 return Ok(());
             }
         }

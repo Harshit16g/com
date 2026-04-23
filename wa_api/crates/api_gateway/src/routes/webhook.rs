@@ -209,10 +209,22 @@ async fn evo_webhook(
                 let redis = state.redis.clone();
                 let _ = redis.set_instance_health(instance, &health).await;
 
-                // Sync to Platform (Leaex v2)
+                // Sync to Platform via RPC
                 if let Ok(Some(tenant)) = state.db.get_tenant_by_instance_name(instance).await {
-                    if let Some(partner_id) = tenant.partner_id {
-                        sync_to_platform(&state, partner_id, instance, health.as_str()).await;
+                    if let (Some(platform_db), Some(org_id)) = (&state.platform_db, &tenant.partner_id) {
+                        let payload = json!({
+                            "status": health.as_str(),
+                            "instance": instance,
+                            "phone": tenant.wa_number,
+                            "timestamp": chrono::Utc::now()
+                        });
+                        let _ = state.db.sync_to_platform_rpc(
+                            platform_db,
+                            org_id,
+                            instance,
+                            "status",
+                            payload
+                        ).await;
                     }
                 }
             }
@@ -328,10 +340,21 @@ async fn evo_webhook(
                     let _ = redis.set_string_ex(&key, base64, 40).await;
                     info!(instance = %instance, "Stored refreshed QR code in cache");
 
-                    // Notify platform that QR is pending scan
+                    // Notify platform via RPC that QR is pending scan
                     if let Ok(Some(tenant)) = state.db.get_tenant_by_instance_name(instance).await {
-                        if let Some(partner_id) = tenant.partner_id {
-                            sync_to_platform(&state, partner_id, instance, "qr_pending").await;
+                        if let (Some(platform_db), Some(org_id)) = (&state.platform_db, &tenant.partner_id) {
+                            let payload = json!({
+                                "status": "qr_pending",
+                                "instance": instance,
+                                "timestamp": chrono::Utc::now()
+                            });
+                            let _ = state.db.sync_to_platform_rpc(
+                                platform_db,
+                                org_id,
+                                instance,
+                                "status",
+                                payload
+                            ).await;
                         }
                     }
                 }
@@ -364,44 +387,7 @@ async fn evo_webhook(
     (StatusCode::OK, Json(json!({"ok": true}))).into_response()
 }
 
-/// Notify the main platform (Leaex v2) of status changes.
-async fn sync_to_platform(
-    state: &AppState,
-    partner_id: uuid::Uuid,
-    instance_name: &str,
-    status: &str,
-) {
-    let url = match &state.config.platform_webhook_url {
-        Some(u) => u,
-        None => return,
-    };
-
-    let platform_status = match status {
-        "active" | "open" | "connected" => "connected",
-        "qr_required" | "qr_pending" => "qr_pending",
-        "banned" => "banned",
-        "connecting" => "connecting",
-        _ => "disconnected",
-    };
-
-    let client = reqwest::Client::new();
-    let payload = json!({
-        "partner_id": partner_id,
-        "instance_id": instance_name,
-        "status": platform_status,
-    });
-
-    let mut request = client.post(url).json(&payload);
-    if let Some(key) = &state.config.platform_api_key {
-        request = request.header("x-platform-api-key", key);
-    }
-
-    if let Err(e) = request.send().await {
-        error!(partner_id = %partner_id, "Failed to sync status to platform: {}", e);
-    } else {
-        info!(partner_id = %partner_id, status = %platform_status, "Synced status to platform");
-    }
-}
+/// Notify the main platform (Leaex v2) of status changes - DELETED (Now using RPC)
 
 pub fn router() -> Router<Arc<AppState>> {
     Router::new()
