@@ -5,7 +5,7 @@ use shared::{
     evo::EvoError,
     redis_client::RedisClient,
     types::{InstanceHealth, JobStatus, MessagePayload, WhatsAppJob},
-    utils::{hash_phone, now_unix_i64, seconds_until_ist_midnight},
+    utils::{now_unix_i64, seconds_until_ist_midnight},
 };
 use std::sync::Arc;
 use std::time::Duration;
@@ -121,10 +121,9 @@ async fn process_job(worker_id: usize, job: WhatsAppJob, state: Arc<AppState>) {
     .await;
 
     // ── Step 4: Spam guard double-check (R6: Atomic) ──────────────────────
-    let phone_hash = hash_phone(&job.recipient_phone);
     let ttl = seconds_until_ist_midnight();
     let allowed = redis
-        .spam_guard_check_and_incr(&phone_hash, 5, ttl)
+        .spam_guard_check_and_incr(&job.recipient_phone, 5, ttl)
         .await
         .unwrap_or(false);
     if !allowed {
@@ -137,12 +136,12 @@ async fn process_job(worker_id: usize, job: WhatsAppJob, state: Arc<AppState>) {
 
     // ── Step 5: Opt-out check ─────────────────────────────────────────────
     let mut is_opt_out = false;
-    match redis.get_cached_opt_out(&phone_hash).await {
+    match redis.get_cached_opt_out(&job.recipient_phone).await {
         Ok(Some(status)) => is_opt_out = status,
-        _ => match state.db.is_opted_out_platform(&phone_hash).await {
+        _ => match state.db.is_opted_out_platform(&job.recipient_phone).await {
             Ok(status) => {
                 is_opt_out = status;
-                let _ = redis.cache_opt_out(&phone_hash, status).await;
+                let _ = redis.cache_opt_out(&job.recipient_phone, status).await;
             }
             Err(e) => warn!("Opt-out DB check error: {} — proceeding", e),
         },
@@ -207,11 +206,23 @@ async fn process_job(worker_id: usize, job: WhatsAppJob, state: Arc<AppState>) {
             // Mark idempotency
             let _ = redis.mark_sent(&job.idempotency_key).await;
 
-            // Increment other counters (non-critical if they fail)
-            let _ = redis.spam_guard_incr_week(&phone_hash).await;
-            let _ = redis.incr_partner_daily(tenant_id, &phone_hash).await;
             let _ = redis
-                .spam_guard_add_partner_today(&phone_hash, &shared::utils::hash_id(&job.partner_id))
+                .set_string(
+                    "engine_last_activity",
+                    &shared::utils::now_unix().to_string(),
+                )
+                .await;
+
+            // Increment other counters (non-critical if they fail)
+            let _ = redis.spam_guard_incr_week(&job.recipient_phone).await;
+            let _ = redis
+                .incr_partner_daily(tenant_id, &job.recipient_phone)
+                .await;
+            let _ = redis
+                .spam_guard_add_partner_today(
+                    &job.recipient_phone,
+                    &shared::utils::hash_id(&job.partner_id),
+                )
                 .await;
 
             persist_status(&state.db, &job, JobStatus::Sent, Some(msg_id), None).await;
@@ -346,8 +357,6 @@ async fn persist_status(
     msg_id: Option<String>,
     error_reason: Option<String>,
 ) {
-    let phone_hash = hash_phone(&job.recipient_phone);
-
     // Pool sends show "leaex_pool" — never the actual pool number
     let instance_used = if job.message_type == shared::types::MessageType::Campaign {
         "leaex_pool".to_string()
@@ -359,7 +368,6 @@ async fn persist_status(
         tenant_id: job.tenant_id,
         campaign_id: job.campaign_id,
         message_type: job.message_type.as_str().to_string(),
-        recipient_phone_hash: phone_hash,
         recipient_phone: job.recipient_phone.clone(),
         recipient_name: job.recipient_name.clone(),
         instance_used,

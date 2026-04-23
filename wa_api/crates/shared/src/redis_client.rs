@@ -5,8 +5,9 @@ use fred::{
     prelude::*,
     types::{Expiration, MultipleZaddValues, SetOptions},
 };
-use futures::stream::StreamExt;
 use serde::{de::DeserializeOwned, Serialize};
+use tokio_stream::StreamExt as _;
+use uuid::Uuid;
 
 use crate::types::{InstanceHealth, WhatsAppJob};
 
@@ -106,6 +107,37 @@ impl RedisClient {
             )
             .await?;
         Ok(result.is_some())
+    }
+
+    pub async fn zadd_etiquette_delay(
+        &self,
+        tenant_id: &Uuid,
+        phone: &str,
+        score: f64,
+    ) -> Result<()> {
+        let key = "etiquette:delay_queue";
+        let val = format!("{}:{}", tenant_id, phone);
+        let values = MultipleZaddValues::try_from((score, val))?;
+        let _: () = self
+            .pool
+            .zadd(key, None, None, false, false, values)
+            .await?;
+        Ok(())
+    }
+
+    pub async fn zrange_etiquette_deadlines(&self, max_score: f64) -> Result<Vec<String>> {
+        let key = "etiquette:delay_queue";
+        Ok(self
+            .pool
+            .zrangebyscore(key, f64::MIN, max_score, false, None)
+            .await?)
+    }
+
+    pub async fn zrem_etiquette_delay(&self, tenant_id: &Uuid, phone: &str) -> Result<()> {
+        let key = "etiquette:delay_queue";
+        let val = format!("{}:{}", tenant_id, phone);
+        let _: () = self.pool.zrem(key, val).await?;
+        Ok(())
     }
 
     pub async fn is_locked(&self, key: &str) -> Result<bool> {

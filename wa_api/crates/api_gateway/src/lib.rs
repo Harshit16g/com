@@ -26,6 +26,7 @@ pub async fn start_server(state: Arc<AppState>) -> Result<()> {
         .merge(routes::campaign::partner_router())
         .merge(routes::instance::router())
         .merge(routes::analytics::router())
+        .merge(routes::contact::router())
         .route_layer(middleware::from_fn_with_state(
             Arc::clone(&state),
             auth::auth_middleware,

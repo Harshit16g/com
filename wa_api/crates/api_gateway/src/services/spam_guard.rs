@@ -1,7 +1,4 @@
-use shared::{
-    redis_client::RedisClient,
-    utils::{hash_id, hash_phone},
-};
+use shared::{redis_client::RedisClient, utils::hash_id};
 use uuid::Uuid;
 
 /// Platform-wide daily limit (across ALL partners to same number)
@@ -26,12 +23,11 @@ pub async fn check(
     tenant_id: &Uuid,
     partner_id: &Uuid,
 ) -> anyhow::Result<SpamGuardResult> {
-    let phone_hash = hash_phone(phone);
     let _partner_hash = hash_id(partner_id);
     let tenant_id_str = tenant_id.to_string();
 
     // Rule 1: Global daily platform limit (5 msgs/day to same phone from any partner)
-    let today_count = redis.spam_guard_get_today(&phone_hash).await?;
+    let today_count = redis.spam_guard_get_today(phone).await?;
     if today_count >= PLATFORM_DAILY_LIMIT {
         return Ok(SpamGuardResult {
             allowed: false,
@@ -40,7 +36,7 @@ pub async fn check(
     }
 
     // Rule 2: Multi-partner cap (if already received from 3+ different partners today, block all)
-    let partner_count = redis.spam_guard_partner_count_today(&phone_hash).await?;
+    let partner_count = redis.spam_guard_partner_count_today(phone).await?;
     if partner_count >= MAX_PARTNERS_PER_DAY {
         return Ok(SpamGuardResult {
             allowed: false,
@@ -49,7 +45,7 @@ pub async fn check(
     }
 
     // Rule 3: Per-partner daily limit (3 msgs/day from same partner to same number)
-    let partner_today = redis.get_partner_daily(&tenant_id_str, &phone_hash).await?;
+    let partner_today = redis.get_partner_daily(&tenant_id_str, phone).await?;
     if partner_today >= PARTNER_DAILY_LIMIT {
         return Ok(SpamGuardResult {
             allowed: false,
@@ -58,7 +54,7 @@ pub async fn check(
     }
 
     // Rule 4: Weekly volume cap (15 platform messages to any single phone in 7 days)
-    let week_count = redis.spam_guard_get_week(&phone_hash).await?;
+    let week_count = redis.spam_guard_get_week(phone).await?;
     if week_count >= WEEKLY_LIMIT {
         return Ok(SpamGuardResult {
             allowed: false,
@@ -80,17 +76,14 @@ pub async fn record_send(
     tenant_id: &Uuid,
     partner_id: &Uuid,
 ) -> anyhow::Result<()> {
-    let phone_hash = hash_phone(phone);
     let partner_hash = hash_id(partner_id);
     let tenant_id_str = tenant_id.to_string();
 
-    redis.spam_guard_incr_today(&phone_hash).await?;
-    redis.spam_guard_incr_week(&phone_hash).await?;
+    redis.spam_guard_incr_today(phone).await?;
+    redis.spam_guard_incr_week(phone).await?;
+    redis.incr_partner_daily(&tenant_id_str, phone).await?;
     redis
-        .incr_partner_daily(&tenant_id_str, &phone_hash)
-        .await?;
-    redis
-        .spam_guard_add_partner_today(&phone_hash, &partner_hash)
+        .spam_guard_add_partner_today(phone, &partner_hash)
         .await?;
 
     Ok(())

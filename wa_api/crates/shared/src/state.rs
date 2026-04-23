@@ -8,6 +8,7 @@ pub struct AppState {
     pub redis: RedisClient, // Internally wraps fred::RedisPool
     pub config: AppConfig,
     pub evo: EvoClient,
+    pub platform_db: Option<sqlx::PgPool>,
 }
 
 pub async fn init() -> AppState {
@@ -22,6 +23,18 @@ pub async fn init() -> AppState {
         .await
         .expect("Failed to connect to PG pool");
 
+    let platform_db = if let Some(url) = &config.platform_database_url {
+        info!("Connecting to platform database...");
+        let pool = sqlx::postgres::PgPoolOptions::new()
+            .max_connections(5)
+            .connect(url)
+            .await
+            .expect("Failed to connect to Platform PG pool");
+        Some(pool)
+    } else {
+        None
+    };
+
     let evo = EvoClient::new(&config.evo_base_url, &config.evo_api_key);
 
     info!("Shared state initialized successfully.");
@@ -31,5 +44,6 @@ pub async fn init() -> AppState {
         redis,
         db,
         evo,
+        platform_db,
     }
 }

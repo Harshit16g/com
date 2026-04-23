@@ -859,9 +859,9 @@ dependencies = [
  "serde",
  "serde_json",
  "shared",
+ "sqlx",
  "tokio",
  "tracing",
- "tracing-subscriber",
  "uuid",
 ]
 
@@ -2263,6 +2263,7 @@ dependencies = [
  "sqlx",
  "thiserror 1.0.69",
  "tokio",
+ "tokio-stream",
  "tracing",
  "uuid",
 ]

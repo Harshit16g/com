@@ -1,7 +1,6 @@
 use axum::{extract::State, http::StatusCode, response::IntoResponse, routing::post, Json, Router};
 use serde::Deserialize;
 use serde_json::json;
-use shared::utils::hash_phone;
 use std::sync::Arc;
 use tracing::{error, info};
 
@@ -119,17 +118,13 @@ async fn evo_webhook(
                         .unwrap_or("")
                         .trim();
 
-                    // 1. Log as INBOUND for analytics/chatbox
                     if let Ok(Some(tenant)) = state.db.get_tenant_by_instance_name(instance).await {
                         let tenant_id = tenant.id;
-                        let phone_hash = hash_phone(&phone);
                         let push_name = msg.get("pushName").and_then(|v| v.as_str());
-
                         let log = shared::db::InteractionLogInsert {
                             tenant_id,
                             campaign_id: None,
                             message_type: "inbound".to_string(),
-                            recipient_phone_hash: phone_hash.clone(),
                             recipient_phone: phone.clone(),
                             recipient_name: push_name.map(|s| s.to_string()),
                             instance_used: instance.clone(),
@@ -142,17 +137,53 @@ async fn evo_webhook(
                             idempotency_key: format!("inbound:{}", msg_id),
                         };
                         let _ = state.db.insert_interaction(&log).await;
+
+                        // ─── 4. Lora Etiquette Bot & RPC Sync ───────────────
+                        let push_name_str = push_name.unwrap_or("Customer");
+
+                        // a) Apply Lora logic
+                        if let Ok(Some(bot_msg)) = shared::etiquette::process_inbound(
+                            state.clone(),
+                            &tenant,
+                            &phone,
+                            push_name_str,
+                            body,
+                        )
+                        .await
+                        {
+                            let _ = state.evo.send_text(instance, &phone, &bot_msg).await;
+                        }
+
+                        // b) Platform RPC Sync
+                        if let (Some(platform_db), Some(org_id)) =
+                            (&state.platform_db, &tenant.partner_id)
+                        {
+                            let payload = json!({
+                                "phone": phone,
+                                "body": body,
+                                "push_name": push_name_str,
+                                "msg_id": msg_id,
+                                "direction": "inbound",
+                                "timestamp": chrono::Utc::now()
+                            });
+                            let _ = state
+                                .db
+                                .sync_to_platform_rpc(
+                                    platform_db,
+                                    org_id,
+                                    instance,
+                                    "inbound",
+                                    payload,
+                                )
+                                .await;
+                        }
                     }
 
                     // 2. Handle STOP keywords for opt-out
                     let upper_body = body.to_uppercase();
                     if upper_body == "STOP" || upper_body == "UNSUBSCRIBE" {
-                        let phone_hash = hash_phone(&phone);
-                        info!(phone_hash = %phone_hash, "STOP keyword received — opting out platform-wide");
-                        let _ = state
-                            .db
-                            .upsert_opt_out(&phone_hash, None, "stop_keyword")
-                            .await;
+                        info!(phone = %phone, "STOP keyword received — opting out platform-wide");
+                        let _ = state.db.upsert_opt_out(&phone, None, "stop_keyword").await;
                     }
                 }
             }

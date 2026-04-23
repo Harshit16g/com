@@ -30,11 +30,6 @@ pub fn sha256(input: &str) -> String {
     hex::encode(hasher.finalize())
 }
 
-/// Hash a phone number for use in spam guard (no PII stored in plaintext).
-pub fn hash_phone(phone: &str) -> String {
-    sha256(phone)
-}
-
 /// Hash a partner/tenant ID.
 pub fn hash_id(id: &Uuid) -> String {
     sha256(&id.to_string())
@@ -93,13 +88,13 @@ pub fn now_unix_i64() -> i64 {
     Utc::now().timestamp()
 }
 
-/// Validate phone number format: must be +91XXXXXXXXXX (10 digits after +91).
+/// Validate phone number format: must start with + and have 8-15 digits.
 pub fn validate_phone(phone: &str) -> bool {
-    if !phone.starts_with("+91") {
+    if !phone.starts_with('+') {
         return false;
     }
-    let digits: String = phone[3..].chars().filter(|c| c.is_ascii_digit()).collect();
-    digits.len() == 10
+    let digits: String = phone[1..].chars().filter(|c| c.is_ascii_digit()).collect();
+    digits.len() >= 8 && digits.len() <= 15
 }
 
 /// Validate message length.

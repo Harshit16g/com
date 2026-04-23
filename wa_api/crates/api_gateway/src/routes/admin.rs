@@ -303,18 +303,37 @@ async fn admin_create_instance(
         ).into_response();
     }
 
-    // 1. Step 1: Database Pre-flight (Local Validation)
+    // 1. Step 1: Resolve metadata from Platform DB (if available)
+    let mut business_name = "our business".to_string();
+    let mut partner_name = "manager".to_string();
+
+    if let Some(platform_db) = &state.platform_db {
+        match state.db.fetch_platform_partner_info(platform_db, &req.partner_id).await {
+            Ok((biz, part)) => {
+                business_name = biz;
+                partner_name = part;
+                info!(instance_name = %req.instance_name, business_name = %business_name, "Fetched partner metadata from platform");
+            }
+            Err(e) => {
+                tracing::warn!("Failed to fetch partner metadata for {}: {}. Using defaults.", req.partner_id, e);
+            }
+        }
+    }
+
+    // 2. Step 2: Database Pre-flight (Local Validation)
     let tenant_id = Uuid::new_v4();
     let insert_result = sqlx::query(
         "INSERT INTO tenants \
-         (id, partner_id, instance_name, instance_status, daily_crm_limit, campaign_enabled) \
-         VALUES ($1, $2, $3, 'disconnected', $4, $5)",
+         (id, partner_id, instance_name, instance_status, daily_crm_limit, campaign_enabled, business_name, partner_name) \
+         VALUES ($1, $2, $3, 'disconnected', $4, $5, $6, $7)",
     )
     .bind(tenant_id)
     .bind(req.partner_id)
     .bind(&req.instance_name)
     .bind(req.daily_crm_limit.unwrap_or(200))
     .bind(req.campaign_enabled.unwrap_or(false))
+    .bind(business_name)
+    .bind(partner_name)
     .execute(state.db.pool())
     .await;
 
@@ -497,7 +516,13 @@ async fn admin_delete_instance(
     // 1. Get instance name before deleting from DB
     let tenant = match state.db.get_tenant(&tenant_id).await {
         Ok(Some(t)) => t,
-        _ => return (StatusCode::NOT_FOUND, Json(json!({"error": "Tenant not found"}))).into_response(),
+        _ => {
+            return (
+                StatusCode::NOT_FOUND,
+                Json(json!({"error": "Tenant not found"})),
+            )
+                .into_response()
+        }
     };
 
     // 2. Delete from Evolution API (WhatsApp Engine)
@@ -509,14 +534,22 @@ async fn admin_delete_instance(
     // 3. Delete from Rust Database
     if let Err(e) = state.db.delete_tenant(&tenant_id).await {
         tracing::error!("Failed to delete tenant from DB: {}", e);
-        return (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": e.to_string()}))).into_response();
+        return (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({"error": e.to_string()})),
+        )
+            .into_response();
     }
 
     // 4. Clear Redis health status
     let redis_key = format!("instance_health:{}", tenant.instance_name);
     if let Err(e) = state.redis.del(&redis_key).await {
         tracing::error!("Failed to delete instance health from Redis: {}", e);
-        return (StatusCode::OK, Json(json!({"status": "deleted", "warning": "Redis cleanup failed"}))).into_response();
+        return (
+            StatusCode::OK,
+            Json(json!({"status": "deleted", "warning": "Redis cleanup failed"})),
+        )
+            .into_response();
     }
 
     (StatusCode::OK, Json(json!({"status": "deleted"}))).into_response()

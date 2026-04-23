@@ -175,11 +175,7 @@ async fn start_campaign(
             continue;
         }
 
-        let phone_hash = shared::utils::hash_phone(phone);
-        let week_count = redis
-            .spam_guard_get_week(&phone_hash)
-            .await
-            .unwrap_or_default();
+        let week_count = redis.spam_guard_get_week(phone).await.unwrap_or_default();
         if week_count >= spam_guard::WEEKLY_LIMIT {
             spam_dropped += 1;
             continue;
@@ -230,6 +226,13 @@ async fn start_campaign(
 
     let _ = redis
         .campaigns_add_active(&campaign_id.to_string(), Utc::now().timestamp() as f64)
+        .await;
+
+    let _ = redis
+        .set_string(
+            "engine_last_activity",
+            &shared::utils::now_unix().to_string(),
+        )
         .await;
 
     (

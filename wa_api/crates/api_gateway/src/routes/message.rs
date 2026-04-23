@@ -21,7 +21,7 @@ use shared::types::TenantContext;
 
 #[derive(Debug, Deserialize)]
 pub struct SendMessageRequest {
-    /// Recipient phone in +91XXXXXXXXXX format
+    /// Recipient phone in E.164 format (+XXXXXXXXXXX)
     pub phone: String,
     /// Message text (max 4096 chars)
     pub message: String,
@@ -56,7 +56,7 @@ async fn send_message(
         return (
             StatusCode::UNPROCESSABLE_ENTITY,
             Json(json!({
-                "error": "Invalid phone format. Expected +91XXXXXXXXXX (10 digits after +91)",
+                "error": "Invalid phone format. Expected international E.164 format (+ and 8-15 digits)",
                 "field": "phone"
             })),
         )
@@ -129,9 +129,7 @@ async fn send_message(
     }
 
     // ── 2. Check opt-out ───────────────────────────────────────────────────
-    let phone_hash = shared::utils::hash_phone(&req.phone);
-
-    if let Ok(true) = state.db.is_opted_out_platform(&phone_hash).await {
+    if let Ok(true) = state.db.is_opted_out_platform(&req.phone).await {
         return (
             StatusCode::OK,
             Json(json!({
@@ -189,7 +187,7 @@ async fn send_message(
         message_type: msg_type,
         recipient_phone: req.phone.clone(),
         recipient_name: req.recipient_name.clone(),
-        payload,
+        payload: payload.clone(),
         retry_count: 0,
         scheduled_at,
         created_at: Utc::now(),
@@ -246,6 +244,43 @@ async fn send_message(
         instance = %ctx.instance_name,
         "CRM message enqueued"
     );
+    let _ = state
+        .redis
+        .set_string(
+            "engine_last_activity",
+            &shared::utils::now_unix().to_string(),
+        )
+        .await;
+
+    // ─── 8. Lora Etiquette & RPC Sync ──────────
+    // Outbound message from partner suppresses bot automated responses
+    let _ = shared::etiquette::process_outbound(state.clone(), &ctx.tenant_id, &req.phone).await;
+
+    // Sync to Platform RPC
+    if let Some(platform_db) = &state.platform_db {
+        let p_body = match &payload {
+            shared::types::MessagePayload::Text { body } => body.clone(),
+            shared::types::MessagePayload::Template { body, .. } => body.clone(),
+        };
+        let sync_payload = json!({
+            "phone": req.phone,
+            "body": p_body,
+            "push_name": "Partner",
+            "msg_id": job_id.to_string(),
+            "direction": "outbound",
+            "timestamp": Utc::now()
+        });
+        let _ = state
+            .db
+            .sync_to_platform_rpc(
+                platform_db,
+                &ctx.partner_id,
+                &ctx.instance_name,
+                "outbound",
+                sync_payload,
+            )
+            .await;
+    }
 
     (
         StatusCode::ACCEPTED,

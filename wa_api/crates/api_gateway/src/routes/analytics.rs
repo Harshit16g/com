@@ -43,8 +43,8 @@ struct InteractionRow {
     id: uuid::Uuid,
     campaign_id: Option<uuid::Uuid>,
     message_type: String,
-    /// Masked phone number — never expose full PII in analytics
-    recipient_phone_masked: String,
+    /// Full phone number — dashboard access is limited to privileged roles
+    pub recipient_phone: String,
     recipient_name: Option<String>,
     instance_used: String,
     status: String,
@@ -128,7 +128,7 @@ async fn messages_analytics(
                     id: r.id,
                     campaign_id: r.campaign_id,
                     message_type: r.message_type,
-                    recipient_phone_masked: shared::utils::mask_phone(&r.recipient_phone),
+                    recipient_phone: r.recipient_phone,
                     recipient_name: r.recipient_name,
                     instance_used: r.instance_used,
                     status: r.status,

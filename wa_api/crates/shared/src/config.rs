@@ -32,11 +32,15 @@ pub struct AppConfig {
     pub cors_allowed_origins: Vec<String>,
     /// Number of concurrent worker loops to spawn.
     pub worker_count: u32,
+    /// Remote platform database for session cross-referencing (Supabase/Neon)
+    pub platform_database_url: Option<String>,
 }
 
 impl AppConfig {
     pub fn from_env() -> Result<Self> {
         let _ = dotenv(); // ignore if .env missing (Railway uses real env vars)
+
+        let platform_database_url = env::var("PLATFORM_DATABASE_URL").ok();
 
         let cors_origins_str = env::var("CORS_ALLOWED_ORIGINS").unwrap_or_else(|_| "*".to_string());
         let cors_allowed_origins: Vec<String> = cors_origins_str
@@ -102,6 +106,7 @@ impl AppConfig {
             admin_api_key,
             cors_allowed_origins,
             worker_count,
+            platform_database_url,
         })
     }
 }

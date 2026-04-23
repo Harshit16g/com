@@ -19,39 +19,79 @@ pub async fn start(state: Arc<AppState>) -> Result<()> {
     let db = &state.db;
     let alert_url = state.config.alert_webhook_url.clone();
 
-    info!("Health monitor started — checking every 5 minutes");
+    // Spawn dedicated etiquette loop (checks every 60s)
+    let etiquette_state = state.clone();
+    tokio::spawn(async move {
+        loop {
+            if let Err(e) = shared::etiquette::check_deadlines(etiquette_state.clone()).await {
+                error!("Etiquette loop error: {}", e);
+            }
+            sleep(Duration::from_secs(60)).await;
+        }
+    });
 
-    let mut last_ping = std::time::Instant::now();
+    info!("Health monitor started — using dynamic activity-based intervals");
+
+    let mut last_orphan_cleanup = std::time::Instant::now();
+
+    // Initial check on startup
+    if let Err(e) = check_all_instances(redis, evo, db, &alert_url).await {
+        error!("Initial health check error: {}", e);
+    }
 
     loop {
-        // Ping evo every minute
-        if last_ping.elapsed() >= Duration::from_secs(60) {
-            match evo.fetch_instances().await {
-                Ok(_) => {
-                    info!("ACK SUCCESS — Connection to Evolution API is stable")
-                }
-                Err(e) => error!("ACK FAIL — Connection to Evolution API lost: {}", e),
+        // ── 1. Calculate Sleep Duration ──────────────────────────────────────
+        let last_activity_str = redis
+            .get_string("engine_last_activity")
+            .await
+            .unwrap_or(None);
+        let now_unix = shared::utils::now_unix_i64();
+
+        let is_active = if let Some(s) = last_activity_str {
+            let activity_ts = s.parse::<i64>().unwrap_or(0);
+            (now_unix - activity_ts) < 15 * 60 // 15 minutes window for "Active"
+        } else {
+            false
+        };
+
+        let sleep_duration = if is_active {
+            info!("Engine ACTIVE — using 5-minute monitoring interval");
+            Duration::from_secs(5 * 60)
+        } else {
+            info!("Engine IDLE — using 1-hour monitoring interval");
+            Duration::from_secs(3600)
+        };
+
+        // ── 2. Run Routine Health Checks (at every loop tick) ────────────────
+        match evo.fetch_instances().await {
+            Ok(_) => {
+                info!("ACK SUCCESS — Connection to Evolution API is stable")
             }
-            last_ping = std::time::Instant::now();
+            Err(e) => error!("ACK FAIL — Connection to Evolution API lost: {}", e),
         }
 
         if let Err(e) = check_all_instances(redis, evo, db, &alert_url).await {
-            error!("Health monitor error: {}", e);
+            error!("Health monitor check error: {}", e);
         }
 
         if let Err(e) = reconcile_stale_messages(redis, evo, db).await {
             error!("Reconciliation error: {}", e);
         }
 
-        if let Err(e) = cleanup_orphan_instances(evo, db).await {
-            error!("Orphan cleanup error: {}", e);
-        }
-
         if let Err(e) = recover_stuck_processing_jobs(redis).await {
             error!("Processing recovery error: {}", e);
         }
 
-        sleep(Duration::from_secs(5 * 60)).await;
+        // ── 3. Deep Orphan Cleanup (Every 6 Hours) ───────────────────────────
+        if last_orphan_cleanup.elapsed() >= Duration::from_secs(6 * 3600) {
+            info!("Running 6-hour deep orphan cleanup...");
+            if let Err(e) = cleanup_orphan_instances(state.clone()).await {
+                error!("Deep orphan cleanup error: {}", e);
+            }
+            last_orphan_cleanup = std::time::Instant::now();
+        }
+
+        sleep(sleep_duration).await;
     }
 }
 
@@ -91,12 +131,15 @@ async fn recover_stuck_processing_jobs(redis: &RedisClient) -> Result<()> {
     Ok(())
 }
 
-/// Cleanup instances in evo API that don't exist in our DB for > 1 hour.
-/// Only affects instances matching MANAGED_PREFIXES to avoid deleting
-/// instances from other deployments sharing the same evo API.
-async fn cleanup_orphan_instances(evo: &EvoClient, db: &DbClient) -> Result<()> {
-    info!("Orphan cleanup check — auditing evo API instances");
+/// Cleanup instances in evo API and local DB that don't match platform state.
+/// Matches against comms.wa_sessions in the platform Supabase/Neon DB.
+async fn cleanup_orphan_instances(state: Arc<AppState>) -> Result<()> {
+    let evo = &state.evo;
+    let db = &state.db;
 
+    info!("Orphan cleanup check — auditing against Platform DB");
+
+    // 1. Fetch current world state
     let evo_instances = match evo.fetch_instances().await {
         Ok(i) => i,
         Err(e) => {
@@ -105,14 +148,40 @@ async fn cleanup_orphan_instances(evo: &EvoClient, db: &DbClient) -> Result<()> 
         }
     };
 
-    let db_instances = match db.get_all_instance_names().await {
-        Ok(names) => names,
+    let local_tenants = match db.get_all_tenants().await {
+        Ok(t) => t,
         Err(e) => {
-            error!("Failed to fetch DB instances for orphan check: {}", e);
+            error!("Failed to fetch local tenants for orphan check: {}", e);
             return Ok(());
         }
     };
 
+    // 2. Fetch platform sessions if database is available
+    let platform_sessions = if let Some(platform_db) = &state.platform_db {
+        #[derive(sqlx::FromRow)]
+        struct Session {
+            instance_id: String,
+            org_id: uuid::Uuid,
+        }
+        match sqlx::query_as::<_, Session>("SELECT instance_id, org_id FROM comms.wa_sessions")
+            .fetch_all(platform_db)
+            .await
+        {
+            Ok(rows) => rows
+                .into_iter()
+                .map(|r| (r.instance_id, r.org_id))
+                .collect::<Vec<_>>(),
+            Err(e) => {
+                error!("Failed to fetch platform sessions: {}", e);
+                return Ok(());
+            }
+        }
+    } else {
+        warn!("Platform database not configured — skipping deep sync");
+        return Ok(());
+    };
+
+    // 3. Audit Evo API Instances
     for instance in evo_instances {
         let name = instance
             .get("instance")
@@ -120,7 +189,7 @@ async fn cleanup_orphan_instances(evo: &EvoClient, db: &DbClient) -> Result<()> 
             .and_then(|n| n.as_str())
             .unwrap_or_default();
 
-        if name.is_empty() || db_instances.contains(&name.to_string()) {
+        if name.is_empty() {
             continue;
         }
 
@@ -129,31 +198,65 @@ async fn cleanup_orphan_instances(evo: &EvoClient, db: &DbClient) -> Result<()> 
             continue;
         }
 
-        // Check if it's actually an orphan (not in DB) and how old it is.
-        // We look at 'createdAt' from evo instance data.
-        let created_at_str = instance
-            .get("instance")
-            .and_then(|i| i.get("createdAt"))
-            .and_then(|c| c.as_str())
-            .unwrap_or_default();
+        // Check if platform knows about this instance
+        let platform_exists = platform_sessions.iter().any(|(id, _)| id == name);
 
-        let is_old = if created_at_str.is_empty() {
-            true // If no date, assume old
-        } else {
-            match chrono::DateTime::parse_from_rfc3339(created_at_str) {
-                Ok(dt) => {
-                    let now = chrono::Utc::now();
-                    let age = now.signed_duration_since(dt.with_timezone(&chrono::Utc));
-                    age.num_hours() >= 1 // Delete orphans older than 1 hour
+        if !platform_exists {
+            // Check age before deleting
+            let created_at_str = instance
+                .get("instance")
+                .and_then(|i| i.get("createdAt"))
+                .and_then(|c| c.as_str())
+                .unwrap_or_default();
+
+            let is_old = if created_at_str.is_empty() {
+                true
+            } else {
+                match chrono::DateTime::parse_from_rfc3339(created_at_str) {
+                    Ok(dt) => {
+                        let now = chrono::Utc::now();
+                        let age = now.signed_duration_since(dt.with_timezone(&chrono::Utc));
+                        age.num_hours() >= 1 // Safety: 1 hour grace period
+                    }
+                    Err(_) => true,
                 }
-                Err(_) => true,
-            }
-        };
+            };
 
-        if is_old {
-            warn!(instance = %name, "Deleting orphan evo instance (not in DB)");
-            if let Err(e) = evo.delete_instance(name).await {
-                error!("Failed to delete orphan instance {}: {}", name, e);
+            if is_old {
+                warn!(instance = %name, "Deleting orphan evo instance (missing in Platform DB)");
+                let _ = evo.delete_instance(name).await;
+                // Also deactivate in local DB if it exists
+                let _ = db.mark_tenant_orphan(name, "orphan cleaned").await;
+            }
+        }
+    }
+
+    // 4. Audit Local Tenants for mismatches
+    for tenant in local_tenants {
+        // If not in platform sessions -> Orphan
+        let platform_session = platform_sessions
+            .iter()
+            .find(|(id, _)| id == &tenant.instance_name);
+
+        match platform_session {
+            None => {
+                warn!(instance = %tenant.instance_name, "Local tenant marked as orphan (missing in Platform DB)");
+                let _ = db
+                    .mark_tenant_orphan(&tenant.instance_name, "orphan cleaned")
+                    .await;
+                let _ = evo.delete_instance(&tenant.instance_name).await;
+            }
+            Some((_, org_id)) => {
+                // If partner_id mismatch -> Orphan
+                if let Some(p_id) = tenant.partner_id {
+                    if p_id != *org_id {
+                        warn!(instance = %tenant.instance_name, "Local tenant partner mismatch — purging");
+                        let _ = db
+                            .mark_tenant_orphan(&tenant.instance_name, "orphan cleaned (mismatch)")
+                            .await;
+                        let _ = evo.delete_instance(&tenant.instance_name).await;
+                    }
+                }
             }
         }
     }
