@@ -308,14 +308,22 @@ async fn admin_create_instance(
     let mut partner_name = "manager".to_string();
 
     if let Some(platform_db) = &state.platform_db {
-        match state.db.fetch_platform_partner_info(platform_db, &req.partner_id).await {
+        match state
+            .db
+            .fetch_platform_partner_info(platform_db, &req.partner_id)
+            .await
+        {
             Ok((biz, part)) => {
                 business_name = biz;
                 partner_name = part;
                 info!(instance_name = %req.instance_name, business_name = %business_name, "Fetched partner metadata from platform");
             }
             Err(e) => {
-                tracing::warn!("Failed to fetch partner metadata for {}: {}. Using defaults.", req.partner_id, e);
+                tracing::warn!(
+                    "Failed to fetch partner metadata for {}: {}. Using defaults.",
+                    req.partner_id,
+                    e
+                );
             }
         }
     }

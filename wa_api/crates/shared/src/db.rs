@@ -450,7 +450,10 @@ impl DbClient {
         if let Some(r) = row {
             Ok((r.0, r.1))
         } else {
-            Err(anyhow::anyhow!("Organization {} not found in platform database", org_id))
+            Err(anyhow::anyhow!(
+                "Organization {} not found in platform database",
+                org_id
+            ))
         }
     }
 
