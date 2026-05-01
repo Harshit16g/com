@@ -58,10 +58,7 @@ pub async fn auth_middleware(
     let claims = match verify_supabase_jwt(token, &state.config.supabase_jwt_secret) {
         Ok(c) => c,
         Err(e) => {
-            warn!(
-                "[Partner Auth] JWT verification failed: {}",
-                e
-            );
+            warn!("[Partner Auth] JWT verification failed: {}", e);
             return Err((
                 StatusCode::UNAUTHORIZED,
                 axum::Json(json!({"error": "Invalid token", "details": e.to_string()})),
@@ -104,7 +101,10 @@ pub async fn auth_middleware(
             }
         })
         .ok_or_else(|| {
-            warn!("[Partner Auth] No org_id found and not an admin shadowing. Role: {}", user_role);
+            warn!(
+                "[Partner Auth] No org_id found and not an admin shadowing. Role: {}",
+                user_role
+            );
             (
                 StatusCode::FORBIDDEN,
                 axum::Json(json!({"error": "No org_id found in token and not an admin shadowing"})),

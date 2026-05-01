@@ -241,11 +241,11 @@ async fn process_job(worker_id: usize, job: WhatsAppJob, state: Arc<AppState>) {
         }
 
         Ok(Err(EvoError::Transient(_))) | Ok(Err(EvoError::RateLimit { .. })) | Err(_) => {
-            let (retry_after, err_msg) = match &send_result {
-                Ok(Err(EvoError::RateLimit { retry_after_secs })) => (*retry_after_secs, "RateLimit".to_string()),
-                Ok(Err(EvoError::Transient(msg))) => (30, format!("Transient: {}", msg)),
-                Err(e) => (30, format!("Timeout: {}", e)),
-                _ => (30, "Unknown error".to_string()),
+            let err_msg = match &send_result {
+                Ok(Err(EvoError::RateLimit { .. })) => "RateLimit".to_string(),
+                Ok(Err(EvoError::Transient(msg))) => format!("Transient: {}", msg),
+                Err(e) => format!("Timeout: {}", e),
+                _ => "Unknown error".to_string(),
             };
 
             let delay = match &send_result {

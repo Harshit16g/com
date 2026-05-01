@@ -339,7 +339,12 @@ fn classify_send_error(status: reqwest::StatusCode, body_text: &str) -> Option<E
     if let Ok(json) = serde_json::from_str::<serde_json::Value>(body_text) {
         if json_matches_keywords(
             &json,
-            &["qr_required", "auth_failed", "unauthorized", "authentication_required"],
+            &[
+                "qr_required",
+                "auth_failed",
+                "unauthorized",
+                "authentication_required",
+            ],
         ) {
             return Some(EvoError::AuthRequired(body_text.to_string()));
         }
@@ -350,7 +355,12 @@ fn classify_send_error(status: reqwest::StatusCode, body_text: &str) -> Option<E
 
         if json_matches_keywords(
             &json,
-            &["invalid_number", "not_on_whatsapp", "not registered", "invalid_recipient"],
+            &[
+                "invalid_number",
+                "not_on_whatsapp",
+                "not registered",
+                "invalid_recipient",
+            ],
         ) {
             return Some(EvoError::InvalidRecipient(body_text.to_string()));
         }
@@ -370,7 +380,10 @@ fn classify_send_error(status: reqwest::StatusCode, body_text: &str) -> Option<E
     {
         return Some(EvoError::AuthRequired(body_text.to_string()));
     }
-    if lower.contains("banned") || lower.contains("account_restricted") || lower.contains("suspended") {
+    if lower.contains("banned")
+        || lower.contains("account_restricted")
+        || lower.contains("suspended")
+    {
         return Some(EvoError::Banned(body_text.to_string()));
     }
     if lower.contains("invalid_number")
@@ -409,7 +422,9 @@ fn json_matches_keywords(value: &serde_json::Value, keywords: &[&str]) -> bool {
             keywords.iter().any(|keyword| key_lower.contains(keyword))
                 || json_matches_keywords(nested, keywords)
         }),
-        serde_json::Value::Array(items) => items.iter().any(|item| json_matches_keywords(item, keywords)),
+        serde_json::Value::Array(items) => items
+            .iter()
+            .any(|item| json_matches_keywords(item, keywords)),
         _ => false,
     }
 }
