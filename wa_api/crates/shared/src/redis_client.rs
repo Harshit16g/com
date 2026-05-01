@@ -224,9 +224,10 @@ impl RedisClient {
         Ok(lists)
     }
 
-    pub async fn lpush_ready(&self, tenant_id: &str, job_json: &str) -> Result<()> {
+    /// Push a job ID into the ready queue. Job payload is stored separately under `job:{id}`.
+    pub async fn lpush_ready(&self, tenant_id: &str, job_id: &str) -> Result<()> {
         let key = format!("jobs:ready:{}", tenant_id);
-        let _: () = self.pool.lpush(&key, job_json).await?;
+        let _: () = self.pool.lpush(&key, job_id).await?;
         Ok(())
     }
 
@@ -403,7 +404,8 @@ impl RedisClient {
     // ─── Opt-out cache ────────────────────────────────────────────────────
 
     pub async fn cache_opt_out(&self, phone_hash: &str, status: bool) -> Result<()> {
-        let key = format!("opt_out:{}", phone_hash);
+        let phone_h = crate::utils::sha256(phone_hash);
+        let key = format!("opt_out:{}", phone_h);
         let val = if status { "1" } else { "0" };
         let _: () = self
             .pool
@@ -413,7 +415,8 @@ impl RedisClient {
     }
 
     pub async fn get_cached_opt_out(&self, phone_hash: &str) -> Result<Option<bool>> {
-        let key = format!("opt_out:{}", phone_hash);
+        let phone_h = crate::utils::sha256(phone_hash);
+        let key = format!("opt_out:{}", phone_h);
         let raw: Option<String> = self.pool.get(&key).await?;
         match raw {
             Some(s) => Ok(Some(s == "1")),
@@ -489,12 +492,14 @@ impl RedisClient {
     }
 
     pub async fn incr_partner_daily(&self, tenant_id: &str, phone_hash: &str) -> Result<i64> {
-        let key = format!("rate_limit:{}:{}:daily", tenant_id, phone_hash);
+        let phone_h = crate::utils::sha256(phone_hash);
+        let key = format!("rate_limit:{}:{}:daily", tenant_id, phone_h);
         self.incr_ex(&key, 24 * 3600).await
     }
 
     pub async fn get_partner_daily(&self, tenant_id: &str, phone_hash: &str) -> Result<i64> {
-        let key = format!("rate_limit:{}:{}:daily", tenant_id, phone_hash);
+        let phone_h = crate::utils::sha256(phone_hash);
+        let key = format!("rate_limit:{}:{}:daily", tenant_id, phone_h);
         let raw: Option<String> = self.pool.get(&key).await?;
         Ok(raw.and_then(|s| s.parse().ok()).unwrap_or(0))
     }
@@ -502,12 +507,14 @@ impl RedisClient {
     // ─── Spam guard ───────────────────────────────────────────────────────
 
     pub async fn spam_guard_incr_today(&self, phone_hash: &str) -> Result<i64> {
-        let key = format!("spam_guard:{}:today", phone_hash);
+        let phone_h = crate::utils::sha256(phone_hash);
+        let key = format!("spam_guard:{}:today", phone_h);
         self.incr_ex(&key, 24 * 3600).await
     }
 
     pub async fn spam_guard_get_today(&self, phone_hash: &str) -> Result<i64> {
-        let key = format!("spam_guard:{}:today", phone_hash);
+        let phone_h = crate::utils::sha256(phone_hash);
+        let key = format!("spam_guard:{}:today", phone_h);
         let raw: Option<String> = self.pool.get(&key).await?;
         Ok(raw.and_then(|s| s.parse().ok()).unwrap_or(0))
     }
@@ -519,7 +526,8 @@ impl RedisClient {
         limit: i64,
         ttl_secs: u64,
     ) -> Result<bool> {
-        let key = format!("spam_guard:{}:today", phone_hash);
+        let phone_h = crate::utils::sha256(phone_hash);
+        let key = format!("spam_guard:{}:today", phone_h);
 
         let script = r#"
             local key = KEYS[1]
@@ -554,12 +562,14 @@ impl RedisClient {
     }
 
     pub async fn spam_guard_incr_week(&self, phone_hash: &str) -> Result<i64> {
-        let key = format!("spam_guard:{}:week", phone_hash);
+        let phone_h = crate::utils::sha256(phone_hash);
+        let key = format!("spam_guard:{}:week", phone_h);
         self.incr_ex(&key, 7 * 24 * 3600).await
     }
 
     pub async fn spam_guard_get_week(&self, phone_hash: &str) -> Result<i64> {
-        let key = format!("spam_guard:{}:week", phone_hash);
+        let phone_h = crate::utils::sha256(phone_hash);
+        let key = format!("spam_guard:{}:week", phone_h);
         let raw: Option<String> = self.pool.get(&key).await?;
         Ok(raw.and_then(|s| s.parse().ok()).unwrap_or(0))
     }
@@ -569,14 +579,16 @@ impl RedisClient {
         phone_hash: &str,
         partner_hash: &str,
     ) -> Result<()> {
-        let key = format!("spam_guard:{}:partners_today", phone_hash);
+        let phone_h = crate::utils::sha256(phone_hash);
+        let key = format!("spam_guard:{}:partners_today", phone_h);
         let _: () = self.pool.sadd(&key, partner_hash).await?;
         let _: () = self.pool.expire(&key, 24 * 3600_i64).await?;
         Ok(())
     }
 
     pub async fn spam_guard_partner_count_today(&self, phone_hash: &str) -> Result<i64> {
-        let key = format!("spam_guard:{}:partners_today", phone_hash);
+        let phone_h = crate::utils::sha256(phone_hash);
+        let key = format!("spam_guard:{}:partners_today", phone_h);
         Ok(self.pool.scard(&key).await?)
     }
 

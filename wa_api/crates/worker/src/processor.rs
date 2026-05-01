@@ -106,8 +106,7 @@ async fn process_job(worker_id: usize, job: WhatsAppJob, state: Arc<AppState>) {
     if !got_lock {
         // Another worker is sending on this instance — requeue after brief wait
         sleep(Duration::from_millis(500)).await;
-        let job_json = serde_json::to_string(&job).unwrap_or_default();
-        let _ = redis.lpush_ready(tenant_id, &job_json).await;
+        let _ = redis.lpush_ready(tenant_id, &job_id.to_string()).await;
         return;
     }
 
@@ -121,17 +120,22 @@ async fn process_job(worker_id: usize, job: WhatsAppJob, state: Arc<AppState>) {
     .await;
 
     // ── Step 4: Spam guard double-check (R6: Atomic) ──────────────────────
-    let ttl = seconds_until_ist_midnight();
-    let allowed = redis
-        .spam_guard_check_and_incr(&job.recipient_phone, 5, ttl)
-        .await
-        .unwrap_or(false);
-    if !allowed {
-        warn!(job_id = %job_id, "Spam guard blocked at worker — deferring");
-        defer_to_tomorrow(&redis, &job).await;
-        // Release lock
-        let _ = redis.del(&lock_key).await;
-        return;
+    let is_debug = std::env::var("DEBUG").unwrap_or_else(|_| "false".to_string()) == "true";
+    if !is_debug {
+        let ttl = seconds_until_ist_midnight();
+        let allowed = redis
+            .spam_guard_check_and_incr(&job.recipient_phone, 5, ttl)
+            .await
+            .unwrap_or(false);
+        if !allowed {
+            warn!(job_id = %job_id, "Spam guard blocked at worker — deferring");
+            defer_to_tomorrow(&redis, &job).await;
+            // Release lock
+            let _ = redis.del(&lock_key).await;
+            return;
+        }
+    } else {
+        tracing::debug!("DEBUG mode enabled: skipping worker spam guard");
     }
 
     // ── Step 5: Opt-out check ─────────────────────────────────────────────
@@ -237,7 +241,14 @@ async fn process_job(worker_id: usize, job: WhatsAppJob, state: Arc<AppState>) {
         }
 
         Ok(Err(EvoError::Transient(_))) | Ok(Err(EvoError::RateLimit { .. })) | Err(_) => {
-            let retry_after = match &send_result {
+            let (retry_after, err_msg) = match &send_result {
+                Ok(Err(EvoError::RateLimit { retry_after_secs })) => (*retry_after_secs, "RateLimit".to_string()),
+                Ok(Err(EvoError::Transient(msg))) => (30, format!("Transient: {}", msg)),
+                Err(e) => (30, format!("Timeout: {}", e)),
+                _ => (30, "Unknown error".to_string()),
+            };
+
+            let delay = match &send_result {
                 Ok(Err(EvoError::RateLimit { retry_after_secs })) => *retry_after_secs,
                 Err(_) => 30, // Timeout retry after 30s
                 _ => RETRY_DELAYS
@@ -247,11 +258,11 @@ async fn process_job(worker_id: usize, job: WhatsAppJob, state: Arc<AppState>) {
             };
 
             if job.retry_count >= 3 {
-                error!(job_id = %job_id, "Max retries exceeded — DLQ");
+                error!(job_id = %job_id, error = %err_msg, "Max retries exceeded — DLQ");
                 move_to_dlq(&redis, &job, "max_retries_exceeded").await;
             } else {
-                warn!(job_id = %job_id, retry_count = job.retry_count, retry_after, "Retrying job");
-                retry_with_delay(&redis, &job, retry_after).await;
+                warn!(job_id = %job_id, retry_count = job.retry_count, retry_after = delay, error = %err_msg, "Retrying job");
+                retry_with_delay(&redis, &job, delay).await;
             }
         }
 
@@ -309,7 +320,6 @@ async fn requeue_with_delay(redis: &RedisClient, job: &WhatsAppJob, delay_secs: 
     let scheduled_at = Utc::now() + chrono::Duration::seconds(delay_secs as i64);
     let mut job_copy = job.clone();
     job_copy.scheduled_at = scheduled_at;
-    let _job_json = serde_json::to_string(&job_copy).unwrap_or_default();
     let _ = redis
         .zadd_scheduled(
             &job.tenant_id.to_string(),

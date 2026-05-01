@@ -55,22 +55,12 @@ pub async fn auth_middleware(
 
     let token = auth_header.unwrap();
 
-    // --- DIAGNOSTIC START ---
-    if let Ok(header) = jsonwebtoken::decode_header(token) {
-        tracing::error!(
-            "=== JWT DIAGNOSTIC: Token Header ALG = {:?} ===",
-            header.alg
-        );
-    }
-    // --- DIAGNOSTIC END ---
-
     let claims = match verify_supabase_jwt(token, &state.config.supabase_jwt_secret) {
         Ok(c) => c,
         Err(e) => {
             warn!(
-                "[Partner Auth] JWT verification failed: {}. Token: {}...",
-                e,
-                &token[..token.len().min(8)]
+                "[Partner Auth] JWT verification failed: {}",
+                e
             );
             return Err((
                 StatusCode::UNAUTHORIZED,
@@ -96,10 +86,7 @@ pub async fn auth_middleware(
     let is_admin = user_role == "admin" || user_role == "core_admin" || user_role == "super_admin";
 
     if is_admin {
-        tracing::debug!(
-            "[Partner Auth] Admin shadow access verified for sub={}",
-            claims.sub
-        );
+        tracing::debug!("[Partner Auth] Admin shadow access verified");
     }
 
     // Support Admin Shadowing: If admin, they can provide org_id via x-tenant-id header
@@ -117,11 +104,7 @@ pub async fn auth_middleware(
             }
         })
         .ok_or_else(|| {
-            warn!(
-                "[Partner Auth] No org_id found and not an admin shadowing. Role: {}. Claims: {}",
-                user_role,
-                serde_json::to_string(&claims).unwrap_or_default()
-            );
+            warn!("[Partner Auth] No org_id found and not an admin shadowing. Role: {}", user_role);
             (
                 StatusCode::FORBIDDEN,
                 axum::Json(json!({"error": "No org_id found in token and not an admin shadowing"})),
@@ -228,14 +211,6 @@ pub async fn admin_auth_middleware(
         .and_then(|v| v.to_str().ok())
     {
         if let Some(token) = auth_header.strip_prefix("Bearer ") {
-            // --- DIAGNOSTIC START ---
-            if let Ok(header) = jsonwebtoken::decode_header(token) {
-                tracing::error!(
-                    "=== ADMIN JWT DIAGNOSTIC: Token Header ALG = {:?} ===",
-                    header.alg
-                );
-            }
-            // --- DIAGNOSTIC END ---
             match verify_supabase_jwt(token, &state.config.supabase_jwt_secret) {
                 Ok(claims) => {
                     // Check role in app_metadata or user_metadata or top-level role
@@ -257,11 +232,7 @@ pub async fn admin_auth_middleware(
                     if role == "admin" || role == "core_admin" || role == "super_admin" {
                         return Ok(next.run(req).await);
                     } else {
-                        warn!(
-                            "[Admin Auth] Insufficient role '{}'. Full claims: {}",
-                            role,
-                            serde_json::to_string(&claims).unwrap_or_default()
-                        );
+                        warn!("[Admin Auth] Insufficient role '{}'", role);
                     }
                 }
                 Err(e) => {

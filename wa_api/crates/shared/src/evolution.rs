@@ -1,7 +1,10 @@
 use anyhow::{anyhow, Result};
+use rand::Rng;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use tracing::debug;
+
+use crate::utils::mask_phone;
 
 /// evo API HTTP client.
 /// Wraps calls to the evo API instance running in `evo/`.
@@ -116,7 +119,7 @@ impl EvoClient {
         debug!(
             "Sending text via instance={} to={}",
             instance_name,
-            &phone[..4]
+            mask_phone(phone)
         );
 
         let mut last_error = "Unknown failure".to_string();
@@ -147,8 +150,13 @@ impl EvoClient {
                     if status.is_server_error() {
                         let body_text = resp.text().await.unwrap_or_default();
                         last_error = format!("HTTP {}: {}", status, body_text);
-                        // Retry backoff
-                        tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+                        // Retry with a small exponential backoff + jitter.
+                        let backoff_secs = 2u64.saturating_pow((attempt - 1) as u32).min(8);
+                        let jitter_secs = rand::thread_rng().gen_range(0..=1);
+                        tokio::time::sleep(std::time::Duration::from_secs(
+                            backoff_secs + jitter_secs,
+                        ))
+                        .await;
                         continue;
                     }
 
@@ -157,28 +165,8 @@ impl EvoClient {
                         .await
                         .map_err(|e| EvoError::Transient(e.to_string()))?;
 
-                    // Check for known error strings in response body
-                    let lower = body_text.to_lowercase();
-                    if lower.contains("qr_required")
-                        || lower.contains("auth_failed")
-                        || lower.contains("unauthorized")
-                    {
-                        return Err(EvoError::AuthRequired(body_text));
-                    }
-                    if lower.contains("banned") || lower.contains("account_restricted") {
-                        return Err(EvoError::Banned(body_text));
-                    }
-                    if lower.contains("invalid_number")
-                        || lower.contains("not_on_whatsapp")
-                        || lower.contains("not registered")
-                    {
-                        return Err(EvoError::InvalidRecipient(body_text));
-                    }
-                    if lower.contains("instance_not_found")
-                        || lower.contains("session_closed")
-                        || lower.contains("disconnected")
-                    {
-                        return Err(EvoError::InstanceDisconnected(body_text));
+                    if let Some(mapped_error) = classify_send_error(status, &body_text) {
+                        return Err(mapped_error);
                     }
 
                     // Parse message ID from response
@@ -342,5 +330,86 @@ impl EvoClient {
             .map(|s| s.to_string());
 
         Ok((base64, code))
+    }
+}
+
+fn classify_send_error(status: reqwest::StatusCode, body_text: &str) -> Option<EvoError> {
+    let lower = body_text.to_lowercase();
+
+    if let Ok(json) = serde_json::from_str::<serde_json::Value>(body_text) {
+        if json_matches_keywords(
+            &json,
+            &["qr_required", "auth_failed", "unauthorized", "authentication_required"],
+        ) {
+            return Some(EvoError::AuthRequired(body_text.to_string()));
+        }
+
+        if json_matches_keywords(&json, &["banned", "account_restricted", "suspended"]) {
+            return Some(EvoError::Banned(body_text.to_string()));
+        }
+
+        if json_matches_keywords(
+            &json,
+            &["invalid_number", "not_on_whatsapp", "not registered", "invalid_recipient"],
+        ) {
+            return Some(EvoError::InvalidRecipient(body_text.to_string()));
+        }
+
+        if json_matches_keywords(
+            &json,
+            &["instance_not_found", "session_closed", "disconnected"],
+        ) {
+            return Some(EvoError::InstanceDisconnected(body_text.to_string()));
+        }
+    }
+
+    if lower.contains("qr_required")
+        || lower.contains("auth_failed")
+        || lower.contains("unauthorized")
+        || lower.contains("authentication_required")
+    {
+        return Some(EvoError::AuthRequired(body_text.to_string()));
+    }
+    if lower.contains("banned") || lower.contains("account_restricted") || lower.contains("suspended") {
+        return Some(EvoError::Banned(body_text.to_string()));
+    }
+    if lower.contains("invalid_number")
+        || lower.contains("not_on_whatsapp")
+        || lower.contains("not registered")
+        || lower.contains("invalid_recipient")
+    {
+        return Some(EvoError::InvalidRecipient(body_text.to_string()));
+    }
+    if lower.contains("instance_not_found")
+        || lower.contains("session_closed")
+        || lower.contains("disconnected")
+        || status == reqwest::StatusCode::NOT_FOUND
+    {
+        return Some(EvoError::InstanceDisconnected(body_text.to_string()));
+    }
+
+    if status.is_client_error() {
+        return Some(EvoError::Transient(format!(
+            "client_error: status={} body={}",
+            status, body_text
+        )));
+    }
+
+    None
+}
+
+fn json_matches_keywords(value: &serde_json::Value, keywords: &[&str]) -> bool {
+    match value {
+        serde_json::Value::String(text) => {
+            let lower = text.to_lowercase();
+            keywords.iter().any(|keyword| lower.contains(keyword))
+        }
+        serde_json::Value::Object(map) => map.iter().any(|(key, nested)| {
+            let key_lower = key.to_lowercase();
+            keywords.iter().any(|keyword| key_lower.contains(keyword))
+                || json_matches_keywords(nested, keywords)
+        }),
+        serde_json::Value::Array(items) => items.iter().any(|item| json_matches_keywords(item, keywords)),
+        _ => false,
     }
 }
