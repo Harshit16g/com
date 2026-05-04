@@ -36,3 +36,4 @@ evo_instances/
 postgres_data/
 redis_data/
 evo_postgres_data/
+.gitnexus
