@@ -13,6 +13,8 @@
 .env
 .env.*
 !.env.example
+env.evo
+env.app
 
 # OS / Misc
 .DS_Store
