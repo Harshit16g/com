@@ -175,7 +175,7 @@ flowchart TD
 
 ## Setup
 
-## Prerequisites
+### Prerequisites
 
 - Docker + Docker Compose
 - (Optional local dev) Rust toolchain + Cargo
@@ -186,10 +186,10 @@ flowchart TD
 Create environment files from templates:
 
 - Use root templates:
-  - `/home/runner/work/com/com/.env.app`
-  - `/home/runner/work/com/com/env.evo`
+  - `.env.app`
+  - `env.evo`
 - For evo standalone/local:
-  - `/home/runner/work/com/com/evo/.env.example`
+  - `evo/.env.example`
 
 ### 2) Configure minimum required values
 
@@ -215,7 +215,7 @@ Recommended security values:
 
 ### Option A: Docker (recommended)
 
-From `/home/runner/work/com/com/wa_api`:
+From `wa_api/`:
 
 ```bash
 docker compose up -d
@@ -243,7 +243,7 @@ docker compose -f docker-compose.evo.yml up -d
 
 #### wa_api
 
-From `/home/runner/work/com/com/wa_api`:
+From `wa_api/`:
 
 ```bash
 cargo run -p api-core
@@ -252,7 +252,7 @@ cargo run -p worker-core
 
 #### evo
 
-From `/home/runner/work/com/com/evo`:
+From `evo/`:
 
 ```bash
 npm ci
@@ -265,7 +265,7 @@ npm run start
 
 ## Environment variables
 
-## wa_api (core)
+### wa_api (core)
 
 | Variable | Required | Purpose |
 |---|---|---|
@@ -291,11 +291,11 @@ npm run start
 
 \* `EVO_API_KEY` defaults from `EVO_INTERNAL_API_KEY`/`WEBHOOK_SHARED_SECRET` if absent.
 
-## evo
+### evo
 
 See:
-- `/home/runner/work/com/com/evo/.env.example`
-- `/home/runner/work/com/com/env.evo`
+- `evo/.env.example`
+- `env.evo`
 
 Key groups:
 - Server/network (`SERVER_*`, `CORS_*`)
@@ -314,7 +314,7 @@ Key groups:
 #### wa_api
 
 ```bash
-cd /home/runner/work/com/com/wa_api
+cd wa_api
 cargo fmt --all -- --check
 cargo clippy -- -D warnings
 cargo test
@@ -323,7 +323,7 @@ cargo test
 #### evo
 
 ```bash
-cd /home/runner/work/com/com/evo
+cd evo
 npm ci
 npm run lint:check
 npm run db:generate
@@ -343,6 +343,5 @@ npm run build
 
 ## Additional project docs
 
-- evo upstream docs: `/home/runner/work/com/com/evo/README.md`
-- Root CI workflow: `/home/runner/work/com/com/.github/workflows/ci-cd.yml`
-
+- evo upstream docs: `evo/README.md`
+- Root CI workflow: `.github/workflows/ci-cd.yml`
