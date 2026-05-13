@@ -194,7 +194,7 @@ Create environment files from templates:
 Create local runtime files (untracked):
 
 ```bash
-cp env.app.example .env.app
+cp env.app.example env.app
 cp env.evo.example env.evo
 ```
 
