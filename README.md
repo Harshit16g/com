@@ -187,7 +187,7 @@ Create environment files from templates:
 
 - Use root templates:
   - `.env.app`
-  - `env.evo`
+  - `env.evo` (repository-provided filename)
 - For evo standalone/local:
   - `evo/.env.example`
 
@@ -295,7 +295,7 @@ npm run start
 
 See:
 - `evo/.env.example`
-- `env.evo`
+- `env.evo` (repository-provided filename)
 
 Key groups:
 - Server/network (`SERVER_*`, `CORS_*`)
