@@ -202,6 +202,7 @@ Notes:
 - `env.evo` above is a **root-level** file used for root/`wa_api` compose-based deployment wiring.
 - `evo/.env` is the **service-level** env file for running the `evo/` project directly (from `evo/.env.example`).
 - Precedence is by execution context: root/`wa_api` compose reads root env files, while direct `evo/` runs read only `evo/.env`.
+- Example: `docker compose up` from `wa_api/` uses root `env.evo`; `npm run start` from `evo/` uses `evo/.env`.
 
 ### 2) Configure minimum required values
 
