@@ -95,8 +95,8 @@ sequenceDiagram
 │   ├── src/
 │   ├── .env.example
 │   └── .github/workflows/              # Evo-specific lint/security/publish workflows
-├── .env.app                            # App integration env template
-└── env.evo                             # Evo deployment env template
+├── env.app.example                     # App integration env template
+└── env.evo.example                     # Evo deployment env template
 ```
 
 ---
@@ -186,10 +186,17 @@ flowchart TD
 Create environment files from templates:
 
 - Use root templates:
-  - `.env.app`
-  - `env.evo` (repository-provided filename)
+  - `env.app.example`
+  - `env.evo.example`
 - For evo standalone/local:
   - `evo/.env.example`
+
+Create local runtime files (untracked):
+
+```bash
+cp env.app.example .env.app
+cp env.evo.example env.evo
+```
 
 ### 2) Configure minimum required values
 
@@ -295,7 +302,7 @@ npm run start
 
 See:
 - `evo/.env.example`
-- `env.evo` (repository-provided filename)
+- `env.evo.example`
 
 Key groups:
 - Server/network (`SERVER_*`, `CORS_*`)
