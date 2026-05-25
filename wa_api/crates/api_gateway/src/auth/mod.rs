@@ -134,8 +134,10 @@ pub async fn auth_middleware(
                 if t.partner_id != Some(partner_id) {
                     return Err((
                         StatusCode::FORBIDDEN,
-                        axum::Json(json!({"error": "Instance does not belong to this organization"})),
-                    ))
+                        axum::Json(
+                            json!({"error": "Instance does not belong to this organization"}),
+                        ),
+                    ));
                 }
                 t
             }
@@ -159,7 +161,9 @@ pub async fn auth_middleware(
             Ok(None) => {
                 return Err((
                     StatusCode::FORBIDDEN,
-                    axum::Json(json!({"error": "Partner organization not found or not initialized"})),
+                    axum::Json(
+                        json!({"error": "Partner organization not found or not initialized"}),
+                    ),
                 ))
             }
             Err(e) => {
