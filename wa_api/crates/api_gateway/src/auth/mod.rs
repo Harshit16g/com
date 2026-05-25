@@ -118,21 +118,57 @@ pub async fn auth_middleware(
         is_admin && claims.app_metadata.org_id.is_none()
     );
 
-    // Load partner config from local DB
-    let tenant = match state.db.get_tenant_by_partner_id(&partner_id).await {
-        Ok(Some(t)) => t,
-        Ok(None) => {
-            return Err((
-                StatusCode::FORBIDDEN,
-                axum::Json(json!({"error": "Partner organization not found or not initialized"})),
-            ))
+    // Resolve tenant — if x-instance-id is provided, pin to that specific instance by UUID.
+    // Otherwise fall back to the oldest instance (backward compat for single-instance orgs).
+    // Both paths enforce: the instance must belong to this partner_id (no cross-org access).
+    let instance_id_hdr = req
+        .headers()
+        .get("x-instance-id")
+        .and_then(|v| v.to_str().ok())
+        .and_then(|s| Uuid::parse_str(s).ok());
+
+    let tenant = if let Some(inst_id) = instance_id_hdr {
+        match state.db.get_tenant(&inst_id).await {
+            Ok(Some(t)) => {
+                // Ownership check: instance must belong to this org
+                if t.partner_id != Some(partner_id) {
+                    return Err((
+                        StatusCode::FORBIDDEN,
+                        axum::Json(json!({"error": "Instance does not belong to this organization"})),
+                    ))
+                }
+                t
+            }
+            Ok(None) => {
+                return Err((
+                    StatusCode::NOT_FOUND,
+                    axum::Json(json!({"error": format!("Instance {} not found", inst_id)})),
+                ))
+            }
+            Err(e) => {
+                error!("Tenant lookup error for instance {}: {}", inst_id, e);
+                return Err((
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    axum::Json(json!({"error": "auth service unavailable"})),
+                ));
+            }
         }
-        Err(e) => {
-            error!("Tenant DB lookup error: {}", e);
-            return Err((
-                StatusCode::INTERNAL_SERVER_ERROR,
-                axum::Json(json!({"error": "auth service unavailable"})),
-            ));
+    } else {
+        match state.db.get_tenant_by_partner_id(&partner_id).await {
+            Ok(Some(t)) => t,
+            Ok(None) => {
+                return Err((
+                    StatusCode::FORBIDDEN,
+                    axum::Json(json!({"error": "Partner organization not found or not initialized"})),
+                ))
+            }
+            Err(e) => {
+                error!("Tenant DB lookup error: {}", e);
+                return Err((
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    axum::Json(json!({"error": "auth service unavailable"})),
+                ));
+            }
         }
     };
 

@@ -118,13 +118,47 @@ impl DbClient {
     }
 
     pub async fn get_tenant_by_partner_id(&self, partner_id: &Uuid) -> Result<Option<TenantRow>> {
+        // Returns the oldest instance for backward compat when no instance_name is specified.
         let row = sqlx::query_as::<_, TenantRow>(
             "SELECT id, partner_id, instance_name, wa_number, instance_status, \
              daily_crm_limit, campaign_enabled, is_active, cleanup_notes, \
              business_name, partner_name \
-             FROM tenants WHERE partner_id = $1 LIMIT 1",
+             FROM tenants WHERE partner_id = $1 ORDER BY created_at ASC LIMIT 1",
         )
         .bind(partner_id)
+        .fetch_optional(&self.pool)
+        .await?;
+        Ok(row)
+    }
+
+    pub async fn get_tenants_by_partner_id(&self, partner_id: &Uuid) -> Result<Vec<TenantRow>> {
+        let rows = sqlx::query_as::<_, TenantRow>(
+            "SELECT id, partner_id, instance_name, wa_number, instance_status, \
+             daily_crm_limit, campaign_enabled, is_active, cleanup_notes, \
+             business_name, partner_name \
+             FROM tenants WHERE partner_id = $1 ORDER BY created_at ASC",
+        )
+        .bind(partner_id)
+        .fetch_all(&self.pool)
+        .await?;
+        Ok(rows)
+    }
+
+    /// Resolve a tenant by (partner_id, instance_name) — exact match required.
+    /// This is the primary lookup when the caller specifies which instance they want.
+    pub async fn get_tenant_by_partner_and_instance(
+        &self,
+        partner_id: &Uuid,
+        instance_name: &str,
+    ) -> Result<Option<TenantRow>> {
+        let row = sqlx::query_as::<_, TenantRow>(
+            "SELECT id, partner_id, instance_name, wa_number, instance_status, \
+             daily_crm_limit, campaign_enabled, is_active, cleanup_notes, \
+             business_name, partner_name \
+             FROM tenants WHERE partner_id = $1 AND instance_name = $2 LIMIT 1",
+        )
+        .bind(partner_id)
+        .bind(instance_name)
         .fetch_optional(&self.pool)
         .await?;
         Ok(row)
