@@ -47,15 +47,14 @@ pub async fn start_server(state: Arc<AppState>) -> Result<()> {
         .layer(RequestBodyLimitLayer::new(2 * 1024 * 1024)); // 2MB body limit
 
     // Webhook routes — authenticated via x-webhook-secret from evo API instances
-    let webhook_routes =
-        Router::new()
-            .merge(routes::webhook::router())
-            .route_layer(middleware::from_fn_with_state(
-                Arc::clone(&state),
-                auth::webhook_auth_middleware,
-            ))
-            .layer(DefaultBodyLimit::max(50 * 1024 * 1024))
-            .layer(RequestBodyLimitLayer::new(50 * 1024 * 1024)); // 50MB body limit to allow WhatsApp media payloads
+    let webhook_routes = Router::new()
+        .merge(routes::webhook::router())
+        .route_layer(middleware::from_fn_with_state(
+            Arc::clone(&state),
+            auth::webhook_auth_middleware,
+        ))
+        .layer(DefaultBodyLimit::max(50 * 1024 * 1024))
+        .layer(RequestBodyLimitLayer::new(50 * 1024 * 1024)); // 50MB body limit to allow WhatsApp media payloads
 
     // Health route (unauthenticated — used by load balancers)
     let health_route = Router::new().route("/health", axum::routing::get(|| async { "OK" }));
