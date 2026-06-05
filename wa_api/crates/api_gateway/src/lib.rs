@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use anyhow::Result;
-use axum::{middleware, Router};
+use axum::{extract::DefaultBodyLimit, middleware, Router};
 use tower_http::cors::{AllowHeaders, AllowMethods, AllowOrigin, CorsLayer};
 use tower_http::limit::RequestBodyLimitLayer;
 use tower_http::trace::TraceLayer;
@@ -30,7 +30,9 @@ pub async fn start_server(state: Arc<AppState>) -> Result<()> {
         .route_layer(middleware::from_fn_with_state(
             Arc::clone(&state),
             auth::auth_middleware,
-        ));
+        ))
+        .layer(DefaultBodyLimit::max(2 * 1024 * 1024))
+        .layer(RequestBodyLimitLayer::new(2 * 1024 * 1024)); // 2MB body limit
 
     // Admin routes (wa_api-admin-key)
     // Admin can: manage instances, start/pause/cancel campaigns, update tenant limits
@@ -40,7 +42,9 @@ pub async fn start_server(state: Arc<AppState>) -> Result<()> {
         .route_layer(middleware::from_fn_with_state(
             Arc::clone(&state),
             auth::admin_auth_middleware,
-        ));
+        ))
+        .layer(DefaultBodyLimit::max(2 * 1024 * 1024))
+        .layer(RequestBodyLimitLayer::new(2 * 1024 * 1024)); // 2MB body limit
 
     // Webhook routes — authenticated via x-webhook-secret from evo API instances
     let webhook_routes =
@@ -49,7 +53,9 @@ pub async fn start_server(state: Arc<AppState>) -> Result<()> {
             .route_layer(middleware::from_fn_with_state(
                 Arc::clone(&state),
                 auth::webhook_auth_middleware,
-            ));
+            ))
+            .layer(DefaultBodyLimit::max(50 * 1024 * 1024))
+            .layer(RequestBodyLimitLayer::new(50 * 1024 * 1024)); // 50MB body limit to allow WhatsApp media payloads
 
     // Health route (unauthenticated — used by load balancers)
     let health_route = Router::new().route("/health", axum::routing::get(|| async { "OK" }));
@@ -59,7 +65,6 @@ pub async fn start_server(state: Arc<AppState>) -> Result<()> {
         .merge(partner_routes)
         .merge(admin_routes)
         .merge(webhook_routes)
-        .layer(RequestBodyLimitLayer::new(2 * 1024 * 1024)) // 2MB body limit
         .layer(TraceLayer::new_for_http())
         .layer(cors)
         .with_state(state);
